@@ -1,0 +1,49 @@
+.error{border-color:red;}
+div, form{vertical-align: top;}
+form, div.method{ padding:0.5em; background-color: #eee;}
+div.messages{background-color:#ccc; padding:0 1em;}
+div.log{background-color:#000; color: #fff; padding:0 1em;}
+div.feedback{background-color:#eee; padding:1em; border-color:green;}
+.required::after {content:'*';color:red;}
+form.inline{padding:0;display:inline;background-color:transparent;}
+.link-button {border: none; color: blue; text-decoration: underline; cursor: pointer; background-color:transparent;}
+.link-button:focus {outline: none;}
+.link-button:active {color:red;}
+div.dependent{padding-left:1em;}
+div.pending{color:#f99;}
+div.validated{color:#f44;}
+div.completed{color:#000;}
+div.erased{color:#888;}
+div.primary{font-weight:bold;}
+div.balance-charts div{display:inline-block;}
+label{font-weight: 600;}
+div.attention{border:medium solid #ff8888; margin:10px; padding:10px; background-color: #ffaaaa;}
+
+/**
+ * Tabs
+ */
+div.service{display:none; padding:0.5em; background-color: #ddd;}
+div.service.front{display:block;}
+form.front{display:block;}
+form, div.method{display:none;}
+div.method.front{display:block;}
+div.bigtab{display:inline-block; background-color: #aaa;padding: 0.5em; margin-left:3px; border-radius: 7px 7px 0 0;cursor: pointer;}
+div.bigtab.front{background-color: #ddd;}
+div.littletab{display:inline-block; background-color: #ddd;padding: 0.3em; border:thin solid #eee;border-radius: 5px 5px 0 0;font-size: 85%; cursor: pointer;}
+div.littletab.front{background-color: #eee;}
+div.balance-charts{margin:0.5em 0;}
+div.history-chart{float:right;}
+
+.collapsible {
+  background-color: #eee;
+  color: #444;
+  cursor: pointer;
+}
+div.collapsible-content {
+  padding: 0 18px;
+  display: none;
+  overflow: hidden;
+  background-color: #f1f1f1;
+}
+
+form#viewAccounts>div {float:right;}

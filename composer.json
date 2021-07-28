@@ -1,0 +1,27 @@
+{
+  "name": "credit-commons-software-stack/cc_client",
+  "description": "Browser client implementing the credit commons protocol, for development purposes",
+  "license": "GPL-2.0+",
+  "homepage": "https://creditcommons.net",
+  "minimum-stability": "dev",
+  "authors": [
+    {
+      "name": "Matthew Slater",
+      "email": "matslats@fastmail.com",
+      "homepage": "http://matslats.net",
+      "role": "Maintainer"
+    }
+  ],
+  "repositories": {
+    "cclib": {
+      "type": "vcs",
+      "url": "git@gitlab.com:credit-commons-software-stack/cc-php-lib.git"
+    }
+  },
+  "require": {
+    "credit-commons-software-stack/cc-php-lib": "*"
+  },
+  "autoload": {
+    "psr-4": { "CCClient\\": "src"}
+  }
+}
