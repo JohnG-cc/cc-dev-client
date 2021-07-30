@@ -25,7 +25,7 @@ div.attention{border:medium solid #ff8888; margin:10px; padding:10px; background
 div.service{display:none; padding:0.5em; background-color: #ddd;}
 div.service.front{display:block;}
 form.front{display:block;}
-form, div.method{display:none;}
+div form, div.method{display:none;}
 div.method.front{display:block;}
 div.bigtab{display:inline-block; background-color: #aaa;padding: 0.5em; margin-left:3px; border-radius: 7px 7px 0 0;cursor: pointer;}
 div.bigtab.front{background-color: #ddd;}
