@@ -24,9 +24,8 @@ global $errorfield;
 if ($_POST) {
   extract($_POST);
   if (isset($filterTransactions)) {
-    $transactions = $node->requester()->filterTransactions($_REQUEST);
+    $transactions = $node->requester()->filterTransactions($_REQUEST, get_all_workflows());
     if (!empty($_REQUEST['full'])) {
-      //clientAddInfo(makeTransactionSentences($transactions));
       // not this because it puts a form within a form
       setResponse(makeTransactionSentences($transactions), 'green');
     }
@@ -77,8 +76,7 @@ if ($_POST) {
     }
   }
   elseif (isset($workflows)) {
-    $wf = $node->requester()->getWorkflows();
-    setResponse((array)$wf, 'green');
+    setResponse(get_all_workflows(), 'green');
   }
   elseif (isset($handshake)) {
     list($code, $shakes) = $node->requester()->handshake();
@@ -218,9 +216,9 @@ class MakeForm {
     if ($newTransaction) {
       $output[] = $response = getResponse();
     }
-    $workflows = $node->requester()->getWorkflows();
     $output[] = '<select name = "type">';
     // Show only the top level workflows, for simplicity
+    $workflows = get_all_workflows();
     foreach(reset($workflows) as $workflow) {
       $selected = $type == $workflow->id ? 'selected="selected"' : '';
       $output[] = '<option value="'.$workflow->id.'" '.$selected.'>'.$workflow->label . ': '.$workflow->summary.'</option>';
@@ -242,7 +240,7 @@ class MakeForm {
 
   static function stateChange(&$output) {
     global $stateChange, $node;
-    if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1])) {
+    if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1], get_all_workflows())) {
       $output[] = '<h4>Incomplete Transactions:</h4>';
       foreach ($pending as $t) {
         // show only the pending transactions the current user doesn't have to sign.
@@ -252,12 +250,12 @@ class MakeForm {
         }
       }
     }
-    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'completed'])) {
+    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'completed'], get_all_workflows())) {
       $output[] = '<h4>Completed Transactions:</h4>';
       $output[] = makeTransactionSentences($transactions);
     }
     // Get all the transactions on the ledger
-    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'erased'])) {
+    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'erased'], get_all_workflows())) {
       $output[] = '<h4>Erased Transactions:</h4>';
       $output[] = makeTransactionSentences($transactions);
     }
@@ -272,7 +270,8 @@ class MakeForm {
     $output[] = '<h3>Filter Transactions</h3>';
     $output[] = '<p>See any transaction on this node (no access control for members)</p>';
     if ($filterTransactions) {
-      $output[] = getResponse();
+      // sincie you can't put a form within a form, the filtered transactions go in the message box
+      clientaddInfo(getResponse());
     }
     $output[] = '<br /><label>Payee</label>';
     $output[] = '<input type="textfield" name="payee"/>';
@@ -298,8 +297,8 @@ class MakeForm {
     $output[] = '<br /><label>Description</label>';
     $output[] = '<input type="textfield" name="description" />';
     $output[] = '<br /><label>Show full transaction</label>';
-    $output[] = '<input type="checkbox" name="full" '. ($full??'checked').'"/>';
-    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="View"/>';
+    $output[] = '<input type="checkbox" name="full" value = "1" '. ($full?'checked':'').' />';
+    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="View" />';
     $output[] = ' (There may be more filters detailed in the API documentation)';
   }
 
@@ -503,13 +502,13 @@ function topTransactions() {
       trim($_POST['description']), // this is optional
       $_POST['type'] // this is optional
     );
-    if ($transaction = $node->requester()->submitNewTransaction($main)) {
+    if ($transaction = $node->requester()->submitNewTransaction($main, get_all_workflows())) {
      //setResponse($transaction);
       $transactions[] = $transaction;
     }
   }
   // for the current user to sign
-  if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1])) {
+  if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1], get_all_workflows())) {
     foreach ($pending as $t) {
       if (isset($t->actions->completed)) {
         $transactions[] = $t;
@@ -517,7 +516,7 @@ function topTransactions() {
     }
   }
   if ($transactions) {
-    print '<div class="attention" title="This box is just to show transactions requiring the current user\'s attention">Pending transactions for '.$_GET['acc'].' to sign:';
+    print '<div class="attention" title="This box is just to show transactions requiring the current user\'s attention">Validated and pending transactions of '.$_GET['acc'];
     print makeTransactionSentences($transactions) .'</div>';
   }
 }
@@ -532,19 +531,19 @@ function makeTransactionSentences(array $transactions) :string {
   // It is probably easier to handle if arrays of entries are returned
   $output = '';
   $template = '<div class = "@class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
-  $search = ['@class', '@payee', '@payer', '@quant', '@description', '@links'];
+  $search = ['@class', '@state', '@payee', '@payer', '@quant', '@description', '@links'];
   foreach ($transactions as $transaction) {
-    $links = CreditCommons\Workflows::actionLabels($transaction->workflow, $transaction->state, $transaction->actions);
     // put the links next to the first entry.
     $first = TRUE;
     foreach ($transaction->entries as $entry) {
       $replace = [
         $first ? "primary" : "dependent",
+        $transaction->state,
         $entry->payee->id, // NB these are spoofed account objects, see CreditCommons\Entry::Create
         $entry->payer->id,
         $entry->quant,
         $entry->description,
-        render_action_links($transaction->uuid, $links)
+        render_action_links($transaction)
       ];
       $output .= str_replace($search, $replace, $template);
       $first = FALSE;
@@ -556,19 +555,22 @@ function makeTransactionSentences(array $transactions) :string {
 /**
  * Render the transaction action links as forms which can post
  * @param string $uuid
- * @param array $actions
+ * @param array $labels
+ *   action labels, keyed by target state.
  * @return string
  */
-function render_action_links($uuid, array $links) : string {
-  $output = [];
-  if ($links) {
+function render_action_links(Transaction $transaction) : string {
+  if ($actions = $transaction->transitions) {
     $output[] = '<form method="post" class="inline" action="">';
-    $output[] = '<input type="hidden" name="uuid" value="'.$uuid.'">';
-    foreach ($links as $target_state => $label) {
+    $output[] = '<input type="hidden" name="uuid" value="'.$transaction->uuid.'">';
+    foreach ($transaction->workflow->actionLabels($transaction->state, $actions) as $target_state => $label) {
       $output[] = '<button type="submit" name="stateChange" value="'.$target_state.'" class="link-button">'.$label.'</button>';
     }
+    $output[] = '</form>';
   }
-  $output[] = '</form>';
+  else {
+    $output[] = '<span title = "'.$_GET['acc'].' is unable to do anything to this transaction">(No transitions)</span>';
+  }
   return implode($output);
 }
 
@@ -636,4 +638,19 @@ function display_errors_warnings(int $errno , string $errstr, string $errfile, i
   $message = "$type: <strong>$errstr</strong> at $errfile:$errline";
   //echo $message; dfdf();
   clientAddError($message);
+}
+
+/**
+ * Cache this request as it is needed frequently.
+ * @global type $node
+ * @staticvar type $all_workflows
+ * @return type
+ */
+function get_all_workflows() :array {
+  global $node;
+  static $all_workflows;
+  if (!$all_workflows) {
+    $all_workflows = $node->requester()->getWorkflows();
+  }
+  return $all_workflows;
 }
