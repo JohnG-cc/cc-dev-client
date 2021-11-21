@@ -86,17 +86,17 @@ class Node {
    * @param array $accounts
    * @param string $payee_fee
    * @param string $payer_fee
-   * @param string $rootward_url
+   * @param string $trunkward_url
    * @param type $rate
    */
-  function init(array $accounts, $payee_fee, $payer_fee, $rootward_url, $rate = 1) {
+  function init(array $accounts, $payee_fee, $payer_fee, $trunkward_url, $rate = 1) {
     if (!empty($payer_fee) or !empty($payee_fee)) {
       $this->addFees('fees', $payee_fee, $payer_fee);
     }
     foreach (array_filter($accounts) as $name) {
       $this->addAccount(trim($name));
     }
-    if ($rootward_url) {
+    if ($trunkward_url) {
       if (!is_numeric($rate) and count($div = explode('/', $rate)) == 2) {
         $rate = $div[0]/$div[1];
       }
@@ -104,10 +104,10 @@ class Node {
         echo "Rate '$rate' must be numeric or expressed as a fraction e.g. 2/7";
         exit;
       }
-      $this->addAccountOnRootwardsNode($rootward_url, $rate);
+      $this->addAccountOnRootwardsNode($trunkward_url, $rate);
     }
     else {
-      clientAddInfo("$this->name has no rootwards node");
+      clientAddInfo("$this->name has no trunkwards node");
     }
   }
 
@@ -221,34 +221,34 @@ class Node {
   }
 
   /**
-   * Check the url is a credit commons node, and then add it as a rootward account.
+   * Check the url is a credit commons node, and then add it as a trunkward account.
    *
    * @param string $url
    */
   function addAccountOnRootwardsNode($url, $rate = 1, $local = FALSE) : void {
     global $nodes;
-    if ($rootwards_node_name = $this->checkRootwards($url) and isset($nodes[$rootwards_node_name]) ) {
+    if ($trunkwards_node_name = $this->checkRootwards($url) and isset($nodes[$trunkwards_node_name]) ) {
       die('todo addAccountOnRootwardsNode');
-      $ini = ['bot_account' => $rootwards_node_name, 'bot_rate' => $rate];
+      $ini = ['bot_account' => $trunkwards_node_name, 'bot_rate' => $rate];
       $this->set($ini, 'ledger');
-      $this->addAccount($rootwards_node_name, $url);
-      $nodes[$rootwards_node_name]->addAccount($this->name, $this->url);
+      $this->addAccount($trunkwards_node_name, $url);
+      $nodes[$trunkwards_node_name]->addAccount($this->name, $this->url);
       // @todo change the above to this.
-      $code = $this->creditCommonsClient()->join($rootwards_node_name, 'secret', $url);
+      $code = $this->creditCommonsClient()->join($trunkwards_node_name, 'secret', $url);
       if ($code != 200) {
-        clientAddInfo("Unable to create new account on rootwards node");
+        clientAddInfo("Unable to create new account on trunkwards node");
       }
       //handshake the new account just to test.
       list ($code, $details) = $this->creditCommonsClient()->handshake();
       if ($code == 200) {
-        clientAddInfo("Successfully connected to the rootward node with rate ".$rate);
+        clientAddInfo("Successfully connected to the trunkward node with rate ".$rate);
       }
       else {
-        clientAddInfo("There was a $code problem connecting to the rootward node");
+        clientAddInfo("There was a $code problem connecting to the trunkward node");
       }
     }
     else {
-      clientAddError("The rootwards node $rootwards_node_name does not exist.");
+      clientAddError("The trunkwards node $trunkwards_node_name does not exist.");
     }
   }
 
@@ -260,7 +260,7 @@ class Node {
    * Test the new (remote) url and retrive the node name
    * @param string $url
    * @return string
-   *   The name of the rootwards node.
+   *   The name of the trunkwards node.
    */
   private function checkRootwards(string $url) {
     // Peer certificate CN=`cavesoft.net' did not match expected CN=`ledger.demo.credcom.dev
@@ -286,7 +286,7 @@ class Node {
       print_r($http_response_header);
       return;
     }
-    clientAddError('Could not ping rootwards node '.$url);
+    clientAddError('Could not ping trunkwards node '.$url);
   }
 
   /**

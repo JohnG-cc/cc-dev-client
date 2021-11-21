@@ -24,7 +24,7 @@ global $errorfield;
 if ($_POST) {
   extract($_POST);
   if (isset($filterTransactions)) {
-    $transactions = $node->requester()->filterTransactions($_REQUEST, get_all_workflows());
+    $transactions = $node->requester()->show()->filterTransactions($_REQUEST, get_all_workflows());
     if (!empty($_REQUEST['full'])) {
       // not this because it puts a form within a form
       setResponse(makeTransactionSentences($transactions), 'green');
@@ -35,12 +35,12 @@ if ($_POST) {
     }
   }
   elseif(isset($accountNameAutocomplete)) {
-    $results = $node->requester()->accountNameAutocomplete($fragment);
+    $results = $node->requester()->show()->accountNameAutocomplete($fragment);
     setResponse(implode("\n", $results));
   }
   elseif (isset($accountSummary)) {
     if ($name = $_POST['acc_name']) {
-      if ($stats = $node->requester()->getAccountSummary($name)) {
+      if ($stats = $node->requester()->show()->getAccountSummary($name)) {
         setResponse(formatStats($name, $stats), 'green');
       }
       else {
@@ -49,19 +49,19 @@ if ($_POST) {
     }
     else {
       $formatted = '';
-      foreach ($stats = $node->requester()->getAccountSummary() as $name => $stats) {
+      foreach ($stats = $node->requester()->show()->getAccountSummary() as $name => $stats) {
         $formatted .= formatStats($name, $stats);
       }
       setResponse($formatted, 'green');
     }
   }
   elseif (isset($accountLimits)) {
-    setResponse($node->requester()->getAccountLimits($_POST['limitname']));
+    setResponse($node->requester()->show()->getAccountLimits($_POST['limitname']));
   }
   elseif(isset($accountHistory)) {
     // Get the balances and times.
     $name = $_POST['acc_name'];
-    $history = $node->requester()->getAccountHistory($name);
+    $history = $node->requester()->show()->getAccountHistory($name);
     if (count($history) > 2) {
       setResponse($history, 'green');
     }
@@ -71,26 +71,26 @@ if ($_POST) {
   }
   elseif (isset($stateChange) and isset($uuid)) {
     //Permission is assumed, at least here in the client.
-    if ($node->requester()->transactionChangeState($uuid, $stateChange)) {
+    if ($node->requester()->show()->transactionChangeState($uuid, $stateChange)) {
       clientAddInfo('Transaction saved');
     }
   }
   elseif (isset($workflows)) {
-    setResponse(get_all_workflows(), 'green');
+    setResponse(get_all_workflows(TRUE), 'green');
   }
   elseif (isset($handshake)) {
-    list($code, $shakes) = $node->requester()->handshake();
+    list($code, $shakes) = $node->requester()->show()->handshake();
     if (empty($shakes)) {
       $shakes = 'No remote nodes connected to this node';
     }
     setResponse($shakes, 'green');
   }
   elseif (isset($absoluteAddress)) {
-    $node_names = $node->requester()->getTrunkwardNodeNames();
+    $node_names = $node->requester()->show()->getTrunkwardNodeNames();
     setResponse('/'.implode('/', array_reverse($node_names)), 'green');
   }
   elseif (isset($join)) {
-    $code = $node->requester()->join($join_name, $join_url);
+    $code = $node->requester()->show()->join($join_name, $join_url);
     if ($code == 200) {
       setResponse("The $join_name account was created", 'green');
     }
@@ -333,7 +333,7 @@ class MakeForm {
     }
     $output[] = '<label class=required >Account name</label>';
     $output[] = selectAccount('acc_name', $acc_name, NULL, TRUE).'<br />';
-    $output[] = 'Relative paths to accounts on rootwards nodes (@todo + open branchwards nodes)';
+    $output[] = 'Relative paths to accounts on trunkwards nodes (@todo + open branchwards nodes)';
     $output[] = '<br /><br /><input type = "submit" name = "accountSummary" value = "Show Account" />';
   }
 
@@ -341,6 +341,7 @@ class MakeForm {
     global $acc_name, $accountHistory, $history;
     $output[] = '<h3>View account history</h3>';
     if (isset($history) and @count($history) > 2) {
+      require_once 'nodeviz.php';
       $output[] = get_one_history_chart($acc_name, $history);
     }
     $output[] = '<p>A list of balances and times, starting with account creation.</p>';
@@ -354,7 +355,7 @@ class MakeForm {
 
   static function workflows(&$output) {
     global $workflows;
-    $output[] = '<p>Workflows must be shared between nodes who would share transactions. Therefore workflows are read from rootwards nodes.</p>';
+    $output[] = '<p>Workflows must be shared between nodes who would share transactions. Therefore workflows are read from trunkwards nodes.</p>';
     if ($workflows) {
       $output[] = getResponse();
     }
@@ -421,7 +422,7 @@ function selectAccountLocal(string $element_name, $default_val = '', $class = ''
 }
 
 function selectAccountTree(string $element_name, $default_val = '', $class = '', $all_option = FALSE) : string {
-  return '<input name = "'.$element_name.'" type="text" placeholder="ancestors/node/account" value="'. $default_val .'" class="'.$class.'" title="Reference any account in the tree using an absolute or relative address. Note that you are only entitled to insepct rootwards nodes, though others may expose their data." />';
+  return '<input name = "'.$element_name.'" type="text" placeholder="ancestors/node/account" value="'. $default_val .'" class="'.$class.'" title="Reference any account in the tree using an absolute or relative address. Note that you are only entitled to insepct trunkwards nodes, though others may expose their data." />';
 }
 
 function selectAccStatus(string $element_name, $default_val = '') {
@@ -502,10 +503,13 @@ function topTransactions() {
       trim($_POST['description']), // this is optional
       $_POST['type'] // this is optional
     );
-    if ($transaction = $node->requester()->submitNewTransaction($main, get_all_workflows())) {
+    $requester = $node->requester();
+    if ($transaction = $requester->submitNewTransaction($main, get_all_workflows())) {
      //setResponse($transaction);
       $transactions[] = $transaction;
     }
+
+    clientAddInfo("POST $requester->baseUrl/transaction/new<br /><pre>".print_r($requester->options, 1).'</pre>');
   }
   // for the current user to sign
   if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1], get_all_workflows())) {
@@ -527,7 +531,7 @@ function topTransactions() {
  * @return string
  */
 function makeTransactionSentences(array $transactions) :string {
-  // This assumes the entries are in order with branchward nodes following rootward nodes.
+  // This assumes the entries are in order with branchward nodes following trunkward nodes.
   // It is probably easier to handle if arrays of entries are returned
   $output = '';
   $template = '<div class = "@class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
@@ -619,11 +623,12 @@ function clientAddInfo($message) {
 function display_errors_warnings(int $errno , string $errstr, string $errfile, int $errline) {
   switch ($errno) {
     case E_NOTICE:
-      $type = 'E_NOTICE';break;
+    case E_USER_NOTICE:
+      // This is used to show the API requests
+      clientAddInfo($errstr);
+      return;
     case E_WARNING:
       $type = 'E_WARNING';break;
-    case E_USER_NOTICE:
-      $type = 'E_USER_NOTICE';break;
     case E_USER_WARNING:
       $type = 'E_USER_WARNING';break;
     case E_USER_DEPRECATED:
@@ -642,15 +647,19 @@ function display_errors_warnings(int $errno , string $errstr, string $errfile, i
 
 /**
  * Cache this request as it is needed frequently.
- * @global type $node
+ * @global Node $node
  * @staticvar type $all_workflows
  * @return type
  */
-function get_all_workflows() :array {
+function get_all_workflows($show = FALSE) :array {
   global $node;
   static $all_workflows;
   if (!$all_workflows) {
-    $all_workflows = $node->requester()->getWorkflows();
+    $requester = $node->requester();
+    if ($show) {
+      $all_workflows->show();
+    }
+    $all_workflows = $requester->getWorkflows();
   }
   return $all_workflows;
 }
