@@ -19,7 +19,7 @@
     }
   },
   "require": {
-    "credit-commons-software-stack/cc-php-lib": "@dev",
+    "credit-commons-software-stack/cc-php-lib": "@dev"
   },
   "autoload": {
     "psr-4": { "CCClient\\": "src"}
