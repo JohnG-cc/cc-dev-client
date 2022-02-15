@@ -1,27 +1,23 @@
 <?php
 
-use CreditCommons\ClientAPI;
+use CCClient\API;
 
 class Node {
 
   public $name;
-  public $url;
-  public $acc;
-  private $key;
 
-  /**
-   * @param string $node_name
-   * @param string $node_url
-   */
-  function __construct(string $node_url, $acc='', $key='') {
-    $this->url = $node_url;
-    $this->name = '@todo';// to be retrieved via the api
-    $this->acc = $acc;
-    $this->key = $key;
+  function __construct(
+    public string $url,
+    public string $acc='',
+    private string $key=''
+  ) {
+    $this->name = '$name @todo';// to be retrieved via the api
   }
 
-  function requester() : ClientAPI {
-    return new ClientAPI($this->url, $this->acc, $this->key);
+  function requester(bool $show = FALSE) : API {
+    $requester = new API($this->url, $this->acc, $this->key);
+    $requester->show = $show;
+    return $requester;
   }
 
   function user() :string {

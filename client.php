@@ -6,15 +6,14 @@
  * $options is already loaded
  */
 
-use CreditCommons\Transaction;
-use CreditCommons\NewTransaction;
-use CreditCommons\Workflows;
-use CreditCommons\Workflow;
+use CCClient\Transaction;
+use CreditCommons\Leaf\NewTransaction;
+use CreditCommons\Exceptions\CCError;
 
 $message_file = './messages.msg';
 @unlink('../devel.log');
 set_error_handler('display_errors_warnings');
-$account_names = $node->requester()->accountNameAutocomplete();
+$account_names = account_name_autocomplete();
 ?><body bgcolor="fafafa">
 
   Connected to: <?php print $node->url; ?> as <?php print $node->user(); ?>. <a href="index.php">Change...</a>
@@ -24,78 +23,71 @@ global $errorfield;
 if ($_POST) {
   extract($_POST);
   if (isset($filterTransactions)) {
-    $transactions = $node->requester()->show()->filterTransactions($_REQUEST, get_all_workflows());
-    if (!empty($_REQUEST['full'])) {
-      // not this because it puts a form within a form
-      setResponse(makeTransactionSentences($transactions), 'green');
+    get_filtered_transactions($_REQUEST, TRUE);
+  }
+  elseif (isset($getTransaction)) {
+    try {
+      retrieveTransaction($uuid, $format, TRUE);
     }
-    else {
-      //clientAddInfo(implode('<br />', $transactions));
-      setResponse("Transaction uuids:<br />" . implode('<br />', $transactions), 'green');
+    catch (CCError $e) {
+      clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
     }
   }
   elseif(isset($accountNameAutocomplete)) {
-    $results = $node->requester()->show()->accountNameAutocomplete($fragment);
-    setResponse(implode("\n", $results));
+    account_name_autocomplete($fragment, TRUE);
   }
   elseif (isset($accountSummary)) {
-    if ($name = $_POST['acc_name']) {
-      if ($stats = $node->requester()->show()->getAccountSummary($name)) {
-        setResponse(formatStats($name, $stats), 'green');
-      }
-      else {
-        setResponse("Unable to retrieve stats for '$name'", 'red');
-      }
+    try {
+      $node->requester(TRUE)->getAccountSummary($acc_id);
     }
-    else {
-      $formatted = '';
-      foreach ($stats = $node->requester()->show()->getAccountSummary() as $name => $stats) {
-        $formatted .= formatStats($name, $stats);
-      }
-      setResponse($formatted, 'green');
+    catch (CCError $e) {
+      clientAddError("Failed to retrieve stats for account $acc_id: ".$e->makeMessage() );
     }
   }
   elseif (isset($accountLimits)) {
-    setResponse($node->requester()->show()->getAccountLimits($_POST['limitname']));
+    try {
+      $node->requester(TRUE)->getAccountLimits($acc_id);
+    }
+    catch (CCError $e) {
+      clientAddError("Failed to get limits of account $acc_id: ".$e->makeMessage() );
+    }
   }
   elseif(isset($accountHistory)) {
     // Get the balances and times.
-    $name = $_POST['acc_name'];
-    $history = $node->requester()->show()->getAccountHistory($name);
-    if (count($history) > 2) {
-      setResponse($history, 'green');
+    try {
+      $node->requester(TRUE)->getAccountHistory($acc_id);
     }
-    else {
-      setResponse("No history for '$name'", 'green');
+    catch (CCError $e) {
+      clientAddError("Failed to get history of account $acc_id: ".$e->makeMessage() );
     }
+
   }
   elseif (isset($stateChange) and isset($uuid)) {
-    //Permission is assumed, at least here in the client.
-    if ($node->requester()->show()->transactionChangeState($uuid, $stateChange)) {
+    try {
+      $node->requester(TRUE)->transactionChangeState($uuid, $stateChange);
       clientAddInfo('Transaction saved');
+    }
+    catch (CCError $e) {
+      clientAddError('Failed to change transaction state: '.$e->makeMessage() );
     }
   }
   elseif (isset($workflows)) {
-    setResponse(get_all_workflows(TRUE), 'green');
+    get_all_workflows(TRUE);
   }
   elseif (isset($handshake)) {
-    list($code, $shakes) = $node->requester()->show()->handshake();
-    if (empty($shakes)) {
-      $shakes = 'No remote nodes connected to this node';
+    try {
+      $node->requester(TRUE)->handshake();
     }
-    setResponse($shakes, 'green');
+    catch (CCError $e) {
+      clientAddError('Failed to handshake node: '.$e->makeMessage() );
+    }
   }
   elseif (isset($absoluteAddress)) {
-    $node_names = $node->requester()->show()->getTrunkwardNodeNames();
-    setResponse('/'.implode('/', array_reverse($node_names)), 'green');
-  }
-  elseif (isset($join)) {
-    $code = $node->requester()->show()->join($join_name, $join_url);
-    if ($code == 200) {
-      setResponse("The $join_name account was created", 'green');
+    try {
+      $node->requester(TRUE)->getTrunkwardNodeNames();
     }
-    elseif ($code == 404) {
-      setResponse("Name already taken", 'red');
+    catch (CCError $e) {
+      clientAddError('Failed to get trunkward node names: '.$e->makeMessage() );
     }
   }
 }
@@ -139,7 +131,8 @@ if (file_exists($message_file))@unlink($message_file);
 function render_tabs() {
   global $node;
   // Get the operations this user is permitted for, in no particular order.\
-  $operations = $node->requester()->getOptions();
+  $operations = getNodeOperations();
+
   unset($operations['relayTransaction']);
   $operationIds = array_keys($operations);
 
@@ -174,19 +167,23 @@ function render_tabs() {
  * @return type
  */
 function get_method_form($method, $is_front) {
-  $attributes = $output = [];
-  MakeForm::$method($output);
-  $fields = implode($output);
+  global $raw_result;
+  $attributes = $form_lines = [];
+  MakeForm::$method($form_lines);
   $attributes['id'][] = $method;
   $attributes['class'][] = 'method';
   if ($is_front) {
     $attributes['class'][] ='front';
   }
   if ($method == 'stateChange') {
-    return getDivTag($attributes, $fields);
+    return getDivTag($attributes, implode($form_lines));
   }
   else {
-    return getFormTag($attributes, $fields);
+    $output = '';
+    if ($raw_result and $is_front) {
+      clientAddInfo('<p><strong>Response:</strong><br /><pre>'.json_prettify($raw_result).'</pre>');
+    }
+    return $output .= wrapInFormTags($attributes, implode($form_lines));
   }
 }
 
@@ -196,16 +193,13 @@ class MakeForm {
     global $node;
     $output[] = '<h3>Available REST API endpoints for '.$node->user().'</h3>';
     $output[] = '<p>call the node with the REST OPTIONS method to see which endpoints you are permitted to use.</p>';
-    $output[] = '<pre>'.print_r($node->requester()->getOptions(), 1).'</pre>';
+    $output[] = '<pre>'.print_r(getNodeOperations(), 1).'</pre>';
   }
 
-  static function absoluteAddress(&$output) {
+  static function trunkwardNodes(&$output) {
     global $absoluteAddress;
-    $output[] = '<h3>Absolute address</h3>';
+    $output[] = '<h3>Trunkward nodes</h3>';
     $output[] = '<p>Get the the trunkwards nodes which comprise the absolute address of this node.</p>';
-    if ($absoluteAddress) {
-      $output[] = getResponse();
-    }
     $output[] = '<input type = "submit" name = "absoluteAddress" value="Fetch" />';
   }
 
@@ -213,15 +207,11 @@ class MakeForm {
     global $uuid, $newTransaction, $payer, $payee, $quant, $description, $errorfield, $type, $node;
 
     $output[] = '<h3>Register transaction</h3>';
-    if ($newTransaction) {
-      $output[] = $response = getResponse();
-    }
     $output[] = '<select name = "type">';
     // Show only the top level workflows, for simplicity
-    $workflows = get_all_workflows();
-    foreach(reset($workflows) as $workflow) {
-      $selected = $type == $workflow->id ? 'selected="selected"' : '';
-      $output[] = '<option value="'.$workflow->id.'" '.$selected.'>'.$workflow->label . ': '.$workflow->summary.'</option>';
+    foreach(get_all_workflows() as $id => $workflow) {
+      $selected = $type == $id ? 'selected="selected"' : '';
+      $output[] = '<option value="'.$id.'" '.$selected.'>'.$workflow->label . ': '.$workflow->summary.'</option>';
     }
     $output[] = '</select>';
     $output[] = '<p>Create a transaction (as '.$_GET['acc'].')</p>';
@@ -240,39 +230,67 @@ class MakeForm {
 
   static function stateChange(&$output) {
     global $stateChange, $node;
-    if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1], get_all_workflows())) {
+    if ($pending_uuids = get_filtered_transactions(['state' => 'pending'], TRUE)) {
       $output[] = '<h4>Incomplete Transactions:</h4>';
-      foreach ($pending as $t) {
-        // show only the pending transactions the current user doesn't have to sign.
-        // Transactions which require action are shown at the top
-        if (!isset($t->actions->completed)) {
-          $output[] = makeTransactionSentences([$t]);
+      foreach ($pending_uuids as $uuid) {
+        try {
+          $t = retrieveTransaction($uuid, 'full');
+          // show only the pending transactions the current user doesn't have to sign.
+          // Transactions which require action are shown at the top
+          if (!isset($t->transitions->completed)) {
+            $output[] = makeTransactionSentences([$t]);
+          }
+        }
+        catch (CCError $e) {
+          clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
         }
       }
     }
-    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'completed'], get_all_workflows())) {
+    if ($t_uuids = get_filtered_transactions(['state' => 'completed'])) {
       $output[] = '<h4>Completed Transactions:</h4>';
-      $output[] = makeTransactionSentences($transactions);
+      foreach ($t_uuids as $uuid) {
+        try {
+          $completes[] = retrieveTransaction($uuid, 'full');
+        }
+        catch (CCError $e) {
+          clientAddError("Unable to retrieve transaction $uuid. ".$e->getMessage());
+        }
+      }
+      $output[] = makeTransactionSentences($completes);
     }
     // Get all the transactions on the ledger
-    if ($transactions = $node->requester()->filterTransactions(['full' => 1, 'state' => 'erased'], get_all_workflows())) {
+    if ($e_uuids = get_filtered_transactions(['state' => 'erased'])) {
       $output[] = '<h4>Erased Transactions:</h4>';
-      $output[] = makeTransactionSentences($transactions);
+      foreach ($e_uuids as $uuid) {
+        try {
+          $eraseds[] = retrieveTransaction($uuid, 'full');
+        }
+        catch (CCError $e) {
+          clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
+        }
+      }
+      $output[] = makeTransactionSentences($eraseds);
     }
     if (!$output) {
-      $output[] = 'No transactions in the system yet...';
+      $output[] = 'No transactions yet...';
     }
   }
 
+  static function getTransaction(&$output) {
+    global $uuid, $getTransaction;
+    $output[] = '<h3>Get a Transaction</h3>';
+    $output[] = '<br /><label>Uuid</label>';
+    $output[] = '<input type="textfield" name="uuid""/>';
+    $output[] = '<p><label>Format</label>';
+    $output[] = '<br /><input type="radio" name="format" value="HTML">Full';
+    $output[] = '<br /><input type="radio" name="format" value="flat">Flat</p>';
+    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="View" />';
+  }
 
   static function filterTransactions(&$output) {
-    global $payer, $payee, $involving, $uuid, $state, $before, $after, $description, $full, $filterTransactions;
+    global $payer, $payee, $involving, $uuid, $state, $before, $after, $description, $format, $filterTransactions;
     $output[] = '<h3>Filter Transactions</h3>';
     $output[] = '<p>See any transaction on this node (no access control for members)</p>';
-    if ($filterTransactions) {
-      // sincie you can't put a form within a form, the filtered transactions go in the message box
-      clientaddInfo(getResponse());
-    }
     $output[] = '<br /><label>Payee</label>';
     $output[] = '<input type="textfield" name="payee"/>';
     $output[] = '<br /><label>Payer</label>';
@@ -287,18 +305,16 @@ class MakeForm {
     $output[] = '  <option value="completed" '.($state == 'completed' ? "selected" : '').'>Completed</option>';
     $output[] = '  <option value="pending" '.($state == 'pending' ? "selected" : '').'>Pending</option>';
     $output[] = '  <option value="erased" '.($state == 'erased' ? "selected" : '').'>Erased</option>';
-    $output[] = '  <option value="validated" '.($state == 'validated' ? "selected" : '').'>Validated</option>';
+    $output[] = '  <option value="validated" '.($state == 'validated' ? "selected" : '').'>Validated (visible only to author)</option>';
     $output[] = '  <option value="timedout" '.($state == 'timedout' ? "selected" : '').'>Timed out</option>';
     $output[] = '</select>';
-    $output[] = '<br /><label>Date Before</label>';
+    $output[] = '<br /><label>Updated Before</label>';
     $output[] = '<input type="date" name="before" value = "'.$before.'"/>';
-    $output[] = '<br /><label>Date After</label>';
+    $output[] = '<br /><label>Updated After</label>';
     $output[] = '<input type="date" name="after" value = "'.$after.'"/>';
     $output[] = '<br /><label>Description</label>';
     $output[] = '<input type="textfield" name="description" />';
-    $output[] = '<br /><label>Show full transaction</label>';
-    $output[] = '<input type="checkbox" name="full" value = "1" '. ($full?'checked':'').' />';
-    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="View" />';
+    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="View UUIDs" />';
     $output[] = ' (There may be more filters detailed in the API documentation)';
   }
 
@@ -306,83 +322,66 @@ class MakeForm {
     global $fragment, $accountNameAutocomplete, $node;
     $output[] = '<h3>View accounts</h3>';
     $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion.</p>';
-    if ($accountNameAutocomplete) {
-      $output[] = getResponse();
-    }
     $output[] = '<p>Put a fragment of an accountname or path</p>';
     $output[] = '<p>Fragment: <input name="fragment" value="'. $fragment .'" />';
     $output[] = '<input type = "submit" name = "accountNameAutocomplete" value = "Query"/></p>';
   }
 
   static function accountLimits(&$output) {
-    global $accountLimits, $limitname;
+    global $accountLimits, $acc_id;
     $output[] = '<h3>Retrieve account balance limits</h3>';
-    if ($accountLimits) {
-      $output[] = getResponse();
-    }
     $output[] = '<br />Get limits for ';
-    $output[] = selectAccount('limitname', $limitname);
+    $output[] = selectAccount('acc_id', $acc_id);
     $output[] = '<br /><br /><input type = "submit" name = "accountLimits" value = "Retreive" />';
   }
+
   static function accountSummary(&$output) {
-    global $acc_name, $accountSummary;
-    $output[] = '<h3>View account</h3>';
-    $output[] = '<p>Trading summary for an account</p>';
-    if ($accountSummary){
-      $output[] = getResponse();
+    global $acc_id, $accountSummary, $raw_result;
+    $output[] = '<h3>View account(s) summary</h3>';
+    $output[] = '<p>Trading statistics</p>';
+    if ($accountSummary) {
+      $stats = json_decode($raw_result);
+      if ($acc_id) {
+        $output[] = formatStats($acc_id, $stats);
+      }
+      else {
+        foreach ($stats as $name => $stats) {
+          $output[] = formatStats($name, $stats);
+        }
+      }
     }
-    $output[] = '<label class=required >Account name</label>';
-    $output[] = selectAccount('acc_name', $acc_name, NULL, TRUE).'<br />';
+    $output[] = '<br /><label class=required >Account name</label>';
+    $output[] = selectAccount('acc_id', $acc_id, NULL, TRUE).'<br />';
     $output[] = 'Relative paths to accounts on trunkwards nodes (@todo + open branchwards nodes)';
     $output[] = '<br /><br /><input type = "submit" name = "accountSummary" value = "Show Account" />';
   }
 
   static function accountHistory(&$output) {
-    global $acc_name, $accountHistory, $history;
+    global $acc_id, $accountHistory, $raw_result;
     $output[] = '<h3>View account history</h3>';
-    if (isset($history) and @count($history) > 2) {
-      require_once 'nodeviz.php';
-      $output[] = get_one_history_chart($acc_name, $history);
+    if ($accountHistory and $raw_result) {
+      $history = (array)json_decode($raw_result);
+      if (count($history) > 2) {
+        require_once 'nodeviz.php';
+        $output[] = get_one_history_chart($acc_id, $history);
+      }
     }
     $output[] = '<p>A list of balances and times, starting with account creation.</p>';
-    if ($accountHistory){
-      $output[] = getResponse();
-    }
     $output[] = '<label class=required >Account name or path</label>';
-    $output[] = selectAccount('acc_name', $acc_name).'<br />';
+    $output[] = selectAccount('acc_id', $acc_id).'<br />';
     $output[] = '<br /><input type = "submit" name = "accountHistory" value = "Show History" />';
   }
 
   static function workflows(&$output) {
     global $workflows;
-    $output[] = '<p>Workflows must be shared between nodes who would share transactions. Therefore workflows are read from trunkwards nodes.</p>';
-    if ($workflows) {
-      $output[] = getResponse();
-    }
-
+    $output[] = '<p>Workflows must be shared between nodes who would share transactions. Therefore workflows are read from trunkwards nodes and can be overriden by local translations</p>';
     $output[] = '<input type = "submit" name = "workflows" value="View" />';
   }
 
   static function handshake(&$output) {
     global $handshake;
     $output[] = '<p>Check that connected ledgers are online and the hashes match.</p>';
-    if ($handshake) {
-      $output[] = getResponse();
-    }
     $output[] = '<input type = "submit" name = "handshake" value="Handshakes" />';
-  }
-
-  static function join(&$output) {
-    global $join_name, $join_url, $join;
-    if ($join) {
-      $output[] = getResponse();
-    }
-    $output[] = 'Name of new member';
-    $output[] = '<input name = "join_name" placeholder="a..." value = "'.$join_name.'" /><br />';
-    $output[] = 'Url of new member';
-    $output[] = '<input name = "join_url" placeholder="https://..." value = "'.$join_url.'" /><br />';
-
-    $output[] = '<input type = "submit" name = "join" value="Join" />';
   }
 
 }
@@ -395,7 +394,7 @@ function getDivTag(array $attributes, $content) {
   return '<div '.implode(' ', $atts) .'>'.$content.'</div>';
 }
 
-function getFormTag($attributes, $content) {
+function wrapInFormTags($attributes, $content) {
   foreach ($attributes as $at => $vals) {
     $atts[] = $at .'="'.implode(' ', $vals).'"';
   }
@@ -435,25 +434,6 @@ function selectAccStatus(string $element_name, $default_val = '') {
 }
 
 
-function setResponse($value, $col = 'green') {
-  global $response;
-  $response = "<font color=$col>".print_r($value, 1)."</font>";
-}
-
-/**
- *
- * @global string $response
- * @return string
- */
-function getResponse() {
-  global $response;
-  if ($response) {
-    $response = '<pre>'.$response.'</pre>';
-  }
-  return $response;
-}
-
-
 function get_devel_log() : string {
   global $log_file;
   $output = '';
@@ -471,7 +451,7 @@ function showInfo() : string {
   global $info;
   $output = '';
   if ($info) {
-    $output = '<div class ="feedback" title="The request url and body, and any errors returned.">';
+    $output = '<div class ="feedback" title="The request and json response.">';
     $output .= implode("\n<br />", $info);
     $output .= '</div>';
   }
@@ -496,27 +476,27 @@ function topTransactions() {
   $transactions = [];
   // Show this user's actions at the top of the page.
   if (isset($_POST['newTransaction'])) {
-    $main = new NewTransaction (
-      trim($_POST['payee']),
-      trim($_POST['payer']),
-      trim($_POST['quant']),
-      trim($_POST['description']), // this is optional
-      $_POST['type'] // this is optional
-    );
-    $requester = $node->requester();
-    if ($transaction = $requester->submitNewTransaction($main, get_all_workflows())) {
-     //setResponse($transaction);
-      $transactions[] = $transaction;
-    }
-
-    clientAddInfo("POST $requester->baseUrl/transaction/new<br /><pre>".print_r($requester->options, 1).'</pre>');
+    $fields = (object)[
+      'payee' => trim($_POST['payee']),
+      'payer' => trim($_POST['payer']),
+      'quant' => trim($_POST['quant']),
+      'description' => trim($_POST['description']), // this is optional
+      'type' => $_POST['type'] // this is optional
+    ];
+    $newT = NewTransaction::create($fields);
+    $result = $node->requester(TRUE)->submitNewTransaction($newT);
+    $transactions[] = Transaction::createFromJsonClass($result);
   }
+  // Any other initiated transactions
+  $validated = get_filtered_transactions(['state'=> 'validated']);
+  // unset the previous one.
+
   // for the current user to sign
-  if ($pending = $node->requester()->filterTransactions(['state'=> 'pending', 'full' => 1], get_all_workflows())) {
-    foreach ($pending as $t) {
-      if (isset($t->actions->completed)) {
-        $transactions[] = $t;
-      }
+  $pending = get_filtered_transactions(['state'=> 'pending']);
+
+  foreach ($pending as $t) {
+    if (isset($t->actions->completed)) {
+      $transactions[] = $t;
     }
   }
   if ($transactions) {
@@ -527,7 +507,7 @@ function topTransactions() {
 
 /**
  *
- * @param Transaction[] $transactions
+ * @param Transaction[] $transactions in full format.
  * @return string
  */
 function makeTransactionSentences(array $transactions) :string {
@@ -543,8 +523,8 @@ function makeTransactionSentences(array $transactions) :string {
       $replace = [
         $first ? "primary" : "dependent",
         $transaction->state,
-        $entry->payee->id, // NB these are spoofed account objects, see CreditCommons\Entry::Create
-        $entry->payer->id,
+        $entry->payee, // NB these are spoofed account objects, see CreditCommons\Entry::Create
+        $entry->payer,
         $entry->quant,
         $entry->description,
         render_action_links($transaction)
@@ -564,16 +544,23 @@ function makeTransactionSentences(array $transactions) :string {
  * @return string
  */
 function render_action_links(Transaction $transaction) : string {
+  global $node, $user;
   if ($actions = $transaction->transitions) {
     $output[] = '<form method="post" class="inline" action="">';
     $output[] = '<input type="hidden" name="uuid" value="'.$transaction->uuid.'">';
-    foreach ($transaction->workflow->actionLabels($transaction->state, $actions) as $target_state => $label) {
-      $output[] = '<button type="submit" name="stateChange" value="'.$target_state.'" class="link-button">'.$label.'</button>';
+    $workflows = get_all_workflows();
+    if (isset($workflows[$transaction->type])) {
+      foreach ($workflows[$transaction->type]->actionLabels($transaction->state, $actions) as $target_state => $label) {
+        $output[] = '<button type="submit" name="stateChange" value="'.$target_state.'" class="link-button">'.$label.'</button>';
+      }
+      $output[] = '</form>';
     }
-    $output[] = '</form>';
+    else {
+      clientAddError("Missing workflow: $transaction->type:");
+    }
   }
   else {
-    $output[] = '<span title = "'.$_GET['acc'].' is unable to do anything to this transaction">(No transitions)</span>';
+    $output[] = "<span title = \"".$_GET['acc']." is not permittions to do anything to this '$transaction->type' transaction\">(No transitions)</span>";
   }
   return implode($output);
 }
@@ -624,6 +611,7 @@ function display_errors_warnings(int $errno , string $errstr, string $errfile, i
   switch ($errno) {
     case E_NOTICE:
     case E_USER_NOTICE:
+    case E_DEPRECATED:
       // This is used to show the API requests
       clientAddInfo($errstr);
       return;
@@ -641,25 +629,128 @@ function display_errors_warnings(int $errno , string $errstr, string $errfile, i
       print_r(func_get_args());
   }
   $message = "$type: <strong>$errstr</strong> at $errfile:$errline";
-  //echo $message; dfdf();
   clientAddError($message);
 }
 
 /**
  * Cache this request as it is needed frequently.
- * @global Node $node
+ * @global bool $show
  * @staticvar type $all_workflows
- * @return type
+ * @return array
  */
-function get_all_workflows($show = FALSE) :array {
-  global $node;
+function get_all_workflows(bool $show = FALSE) : array {
+  global $node, $config;
   static $all_workflows;
-  if (!$all_workflows) {
-    $requester = $node->requester();
-    if ($show) {
-      $all_workflows->show();
+  if (!isset($all_workflows)) {
+    try {
+      // These are reformatted by the CCClient\API
+      $all_workflows = $node->requester($show)->getWorkflows();
     }
-    $all_workflows = $requester->getWorkflows();
+    catch (CCError $e) {
+      clientAddError('Failed to retrieve workflows: '.$e->makeMessage() );
+      $all_workflows = [];
+    }
   }
   return $all_workflows;
+}
+
+function retrieveTransaction(string $uuid, string $format, $show = FALSE) : Transaction {
+  global $node;
+  $json = $node->requester($show)->getTransaction($uuid, $format);
+  // Upcast the results to the right format,
+  if ($format == 'full') {
+    $transaction = \CCClient\Transaction::create($json);
+  }
+  elseif ($format == 'entry') {
+    $transaction = \CreditCommons\FlatEntry::create($json);
+  }
+  return $transaction;
+}
+
+
+function getNodeOperations() : array {
+  // NB this is sometimes called more than once. could be cached.
+  global $node;
+  try {
+    $operations = $node->requester()->getOptions();
+  }
+  catch (CCError $e) {
+    clientAddError('Unable to retrive paths from node: '.$e->makeMessage() );
+    $operations = [];
+  }
+  return $operations;
+}
+
+function get_filtered_transactions(array $filters, $show = FALSE) : array {
+  global $node;
+  try {
+    $results = $node->requester($show)->filterTransactions($filters);
+  }
+  catch (CCError $e) {
+    clientAddError('Failed to load pending transactions: '.$e->makeMessage() );
+    $results = [];
+  }
+  return $results;
+}
+
+function account_name_autocomplete(string $chars = '', $show = FALSE) : array {
+  global $node;
+  try {
+    $acc_ids = $node->requester($show)->accountNameAutocomplete($chars);
+  }
+  catch (CCError $e) {
+    clientAddError('Failed to retrieve account names.'.$e->makeMessage());
+    $acc_ids = [];
+  }
+  return $acc_ids;
+}
+
+function json_prettify(string $json) {
+	$result      = '';
+	$pos         = 0;
+	$strLen      = strlen($json);
+	$indentStr   = '  ';
+	$newLine     = "\n";
+	$prevChar    = '';
+	$outOfQuotes = true;
+
+	for ($i=0; $i<=$strLen; $i++)
+	{
+		// Grab the next character in the string.
+		$char = substr($json, $i, 1);
+
+		// Are we inside a quoted string?
+		if ($char == '"' && $prevChar != '\\') {
+			$outOfQuotes = !$outOfQuotes;
+
+			// If this character is the end of an element,
+			// output a new line and indent the next line.
+		} else if(($char == '}' || $char == ']') && $outOfQuotes) {
+			$result .= $newLine;
+			$pos --;
+			for ($j=0; $j<$pos; $j++) {
+				$result .= $indentStr;
+			}
+		}
+
+		// Add the character to the result string.
+		$result .= $char;
+
+		// If the last character was the beginning of an element,
+		// output a new line and indent the next line.
+		if (($char == ',' || $char == '{' || $char == '[') && $outOfQuotes) {
+			$result .= $newLine;
+			if ($char == '{' || $char == '[') {
+				$pos ++;
+			}
+
+			for ($j = 0; $j < $pos; $j++) {
+				$result .= $indentStr;
+			}
+		}
+
+		$prevChar = $char;
+	}
+
+	return $result;
 }

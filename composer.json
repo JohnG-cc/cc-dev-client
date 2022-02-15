@@ -14,8 +14,10 @@
   ],
   "repositories": {
     "cclib": {
-      "type": "vcs",
-      "url": "git@gitlab.com:credit-commons-software-stack/cc-php-lib.git"
+      "type": "path",
+      "url": "/home/matslats/Documents/CreditCommons/credit-commons-software-stack/cc-php-lib",
+      "link": "true",
+      "ref": "true"
     }
   },
   "require": {
