@@ -10,14 +10,14 @@ form.inline{padding:0;display:inline;background-color:transparent;}
 .link-button:focus {outline: none;}
 .link-button:active {color:red;}
 div.dependent{padding-left:1em;}
-div.pending{color:#f99;}
+div.pending{color:#f44;}
 div.validated{color:#f44;}
 div.completed{color:#000;}
 div.erased{color:#888;}
 div.primary{font-weight:bold;}
 div.balance-charts div{display:inline-block;}
 label{font-weight: 600;}
-div.attention{border:medium solid #ff8888; margin:10px; padding:10px; background-color: #ffaaaa;}
+div.attention{border:medium solid #ffbbbb; margin:10px; padding:10px; background-color: #ffaaaa;}
 
 /**
  * Tabs

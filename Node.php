@@ -4,14 +4,18 @@ use CCClient\API;
 
 class Node {
 
-  public $name;
+  public $name; // @todo
+  public $accountNames;
+  public $handshake;
 
   function __construct(
     public string $url,
     public string $acc='',
-    private string $key=''
+    public string $key=''
   ) {
-    $this->name = '$name @todo';// to be retrieved via the api
+    $this->name = '$node_name';// There's no api call to retreive the node.
+    $this->handshake = $this->requester()->handshake();
+    $this->accountNames = $this->requester()->accountNameAutocomplete();
   }
 
   function requester(bool $show = FALSE) : API {
@@ -68,6 +72,39 @@ class Node {
       $output = str_replace('["", 0, ""]', implode(",\n    ", $data), $output);
     }
     return $output;
+  }
+
+  function selectAccountWidget($element_name, $default_val, $class, $all_option) {
+    if ($this->isIsolated()) {
+      $output[] = "<select name=\"$element_name\">";
+      if ($all_option) {
+        $output[] = '  <option value="">- All -</option>';
+      }
+
+      foreach ($this->accountNames as $acc_id) {
+        $output[] = '  <option value="'.$acc_id.'"'.($default_val==$acc_id?'selected':'').'>'.$acc_id.'</option>';
+      }
+      $output[] = "</select>";
+      return implode("\n", $output);
+    }
+    else {
+      return '<input name = "'.$element_name.'" type="text" placeholder="ancestors/node/account" value="'. $default_val .'" class="'.$class.'" title="Reference any account in the tree using an absolute or relative address. Note that you are only entitled to insepct trunkwards nodes, though others may expose their data." />';
+    }
+  }
+
+  function isIsolated() : bool {
+    return array_search('200', $this->handshake) <> NULL;
+  }
+
+  function accountNameAutoComplete(string $chars = '', $show = FALSE) : array {
+    try {
+      $acc_ids = $this->requester($show)->accountNameAutocomplete($chars);
+    }
+    catch (CCError $e) {
+      clientAddError('Failed to retrieve account names: '.$e->makeMessage());
+      $acc_ids = [];
+    }
+    return $acc_ids;
   }
 
 }

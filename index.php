@@ -10,13 +10,19 @@
     require_once __DIR__ . '/vendor/autoload.php';
     include 'Node.php';
     if ($_GET and isset($_GET['node'])) {
-      $node = new Node($_GET['node'], $_GET['acc']??'', $_GET['key']??'');
-      if ($options = $node->requester()->getOptions()) {
-        require 'client.php';
-        exit;
+      try {
+        $node = new Node($_GET['node'], $_GET['acc']??'', $_GET['key']??'');
+        global $request_options;
+        if ($request_options = $node->requester()->getOptions()) {
+          require 'client.php';
+          exit;
+        }
       }
-
-  }?>
+      catch (\Exception $e) {
+        echo "Unable to connect to ".$_GET['node'].': '.$e->getMessage();
+      }
+    }
+  ?>
   <body>
     <form method="get">
       <p>The developer client needs admin credentials:</p>
