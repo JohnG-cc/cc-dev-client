@@ -15,7 +15,7 @@ class Node {
   ) {
     $this->name = '$node_name';// There's no api call to retreive the node.
     $this->handshake = $this->requester()->handshake();
-    $this->accountNames = $this->requester()->accountNameAutocomplete();
+    $this->accountNames = $this->requester()->accountNameFilter();
   }
 
   function requester(bool $show = FALSE) : API {
@@ -96,9 +96,9 @@ class Node {
     return array_search('200', $this->handshake) <> NULL;
   }
 
-  function accountNameAutoComplete(string $chars = '', $show = FALSE) : array {
+  function accountNameFilter(string $chars = '', $show = FALSE) : array {
     try {
-      $acc_ids = $this->requester($show)->accountNameAutocomplete($chars);
+      $acc_ids = $this->requester($show)->accountNameFilter('', ['fragment' => $chars]);
     }
     catch (CCError $e) {
       clientAddError('Failed to retrieve account names: '.$e->makeMessage());

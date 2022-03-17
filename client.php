@@ -32,12 +32,17 @@ if ($_POST) {
       clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
     }
   }
-  elseif(isset($accountNameAutocomplete)) {
-    $node->accountNameAutocomplete($fragment, TRUE);
+  elseif(isset($accountNameFilter)) {
+    $node->accountNameFilter($fragment, TRUE);
   }
   elseif (isset($accountSummary)) {
     try {
-      $node->requester(TRUE)->getAccountSummary($acc_id);
+      if (substr($acc_path, -1) == '/') {
+        $node->requester(TRUE)->getAccountSummaries($acc_path);
+      }
+      else {
+        $node->requester(TRUE)->getAccountSummary($acc_path);
+      }
     }
     catch (\Exception $e) {
       clientAddError("Failed to retrieve stats for account $acc_id: ".$e->makeMessage() );
@@ -301,30 +306,30 @@ class MakeForm {
     $output[] = ' (There may be more filters detailed in the API documentation)';
   }
 
-  static function accountNameAutocomplete(&$output) {
-    global $fragment, $accountNameAutocomplete, $node;
+  static function accountNameFilter(&$output) {
+    global $fragment, $accountNameFilter, $node;
     $output[] = '<h3>View accounts</h3>';
     $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion.</p>';
     $output[] = '<p>Put a fragment of an accountname or path</p>';
     $output[] = '<p>Fragment: <input name="fragment" class="required" value="'. $fragment .'" />';
-    $output[] = '<input type = "submit" name = "accountNameAutocomplete" value = "Query"/></p>';
+    $output[] = '<input type = "submit" name = "accountNameFilter" value = "Query"/></p>';
   }
 
   static function accountLimits(&$output) {
-    global $accountLimits, $acc_id;
+    global $accountLimits, $acc_path;
     $output[] = '<h3>Retrieve account balance limits</h3>';
     $output[] = '<br />Get limits for ';
-    $output[] = selectAccount('acc_id', $acc_id);
+    $output[] = selectAccount('acc_path', $acc_path);
     $output[] = '<br /><br /><input type = "submit" name = "accountLimits" value = "Retreive" />';
   }
 
   static function accountSummary(&$output) {
-    global $acc_id, $accountSummary, $raw_result;
+    global $acc_path, $accountSummary, $raw_result;
     $output[] = '<h3>View account(s) summary</h3>';
     $output[] = '<p>Trading statistics</p>';
     if ($accountSummary and $stats = json_decode($raw_result)) {
-      if ($acc_id) {
-        $output[] = formatStats($acc_id, $stats);
+      if (isset($stats->pending)) {
+        $output[] = formatStats($acc_path, $stats);
       }
       else {
         foreach ($stats as $name => $stats) {
@@ -333,14 +338,15 @@ class MakeForm {
       }
     }
     $output[] = '<br /><label class=required >Account name or path</label>';
-    $output[] = selectAccount('acc_id', $acc_id, NULL, TRUE).'<br />';
-    $output[] = 'Use relative paths to explore other nodes.  (@todo + ajax autocomplete on remote nodes)';
-    $output[] = "Leave blank for summaries of all active accounts on the current node.";
+    $output[] = selectAccount('acc_path', $acc_path, NULL, TRUE).'<br />';
+    $output[] = 'Use relative paths to explore other nodes.';
+    $output[] = "Leave blank for summaries of all active accounts on the current node. ";
     $output[] = '<br /><br /><input type = "submit" name = "accountSummary" value = "Show Account" />';
+    $output[] =  "<br />(@todo + ajax autocomplete on remote nodes)";
   }
 
   static function accountHistory(&$output) {
-    global $acc_id, $accountHistory, $raw_result;
+    global $acc_path, $accountHistory, $raw_result;
     $output[] = '<h3>View account history</h3>';
     if ($accountHistory and $raw_result) {
       $history = (array)json_decode($raw_result);
@@ -351,7 +357,7 @@ class MakeForm {
     }
     $output[] = '<p>A list of balances and times, starting with account creation.</p>';
     $output[] = '<label class=required >Account name or path</label>';
-    $output[] = selectAccount('acc_id', $acc_id).'<br />';
+    $output[] = selectAccount('acc_path', $acc_path).'<br />';
     $output[] = '<br /><input type = "submit" name = "accountHistory" value = "Show History" />';
   }
 
