@@ -88,7 +88,7 @@ class Node {
       return implode("\n", $output);
     }
     else {
-      return '<input name = "'.$element_name.'" type="text" placeholder="ancestors/node/account" value="'. $default_val .'" class="'.$class.'" title="Reference any account in the tree using an absolute or relative address. Note that you are only entitled to insepct trunkwards nodes, though others may expose their data." />';
+      return '<input name = "'.$element_name.'" type="text" placeholder="ancestors/node/account" value="'. $default_val .'" class="'.$class.' accountnames" title="Reference any account in the tree using an absolute or relative address. Note that you are only entitled to insepct trunkwards nodes, though others may expose their data." />';
     }
   }
 
@@ -98,7 +98,7 @@ class Node {
 
   function accountNameFilter(string $chars = '', $show = FALSE) : array {
     try {
-      $acc_ids = $this->requester($show)->accountNameFilter('', ['fragment' => $chars]);
+      $acc_ids = $this->requester($show)->accountNameFilter($chars);
     }
     catch (CCError $e) {
       clientAddError('Failed to retrieve account names: '.$e->makeMessage());

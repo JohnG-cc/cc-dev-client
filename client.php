@@ -13,6 +13,7 @@ use CreditCommons\Exceptions\CCError;
 $message_file = './messages.msg';
 @unlink('../devel.log');
 set_error_handler('display_errors_warnings');
+set_exception_handler('print_exception_to_file')
 ?><body bgcolor="fafafa">
 
   Connected to: <?php print $node->url; ?> as <?php print $node->user(); ?>. <a href="index.php">Change...</a>
@@ -111,20 +112,6 @@ print topTransactions(); ?>
     print $tabs ?>
   <?php endif; ?>
   <?php print $log; ?>
-    <script>
-var coll = document.getElementsByClassName("collapsible");
-var i;
-for (i = 0; i < coll.length; i++) {
-  coll[i].addEventListener("click", function() {
-    this.classList.toggle("active");
-    var content = this.nextElementSibling;
-    if (content.style.display === "block") {
-      content.style.display = "none";
-    } else {
-      content.style.display = "block";
-    }
-  });
-}</script>
   </body>
 </html><?php
 if (file_exists($message_file))@unlink($message_file);
@@ -219,9 +206,9 @@ class MakeForm {
     $output[] = '</select>';
     $output[] = '<p>Create a transaction (as '.$_GET['acc'].')</p>';
     // Different account select widgets depending on if the node is isolated.
-    $output[] = '<label class=required>Payee</label>';
+    $output[] = '<label class=required>Payee</label> ';
     $output[] = selectAccount('payee', $payee??'alice', $errorfield == 'payee' ? "error" :'').'<br />';
-    $output[] = '<label class=required>Payer</label>';
+    $output[] = '<label class=required>Payer</label> ';
     $output[] = selectAccount('payer', $payer??'bob', $errorfield == 'payer' ? "error" : '').'<br />';
 
     $output[] = '<label class=required>Quantity</label>';
@@ -312,7 +299,7 @@ class MakeForm {
     $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion.</p>';
     $output[] = '<p>Put a fragment of an accountname or path</p>';
     $output[] = '<p>Fragment: <input name="fragment" class="required" value="'. $fragment .'" />';
-    $output[] = '<input type = "submit" name = "accountNameFilter" value = "Query"/></p>';
+    $output[] = '<input type = "submit"  name = "accountNameFilter" value = "Query"/></p>';
   }
 
   static function accountLimits(&$output) {
@@ -562,6 +549,10 @@ function display_errors_warnings(int $errno , string $errstr, string $errfile, i
   }
   $message = "$type: <strong>$errstr</strong> at $errfile:$errline";
   clientAddError($message);
+}
+
+function print_exception_to_file($exception) {
+  file_put_contents('last_exception.log', print_r($exception, 1)); //temp
 }
 
 /**

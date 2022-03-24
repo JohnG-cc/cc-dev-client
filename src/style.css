@@ -47,3 +47,8 @@ div.collapsible-content {
 }
 
 form#viewAccounts>div {float:right;}
+
+ul.ui-menu {
+  list-style-type: none;
+  background-color: white;
+}
