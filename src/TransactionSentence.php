@@ -29,12 +29,12 @@ class TransactionSentence {
         $entry->payer,
         $entry->quant,
         $entry->description,
-        $this->actionLinks()
+        $first ? $this->actionLinks() : ''
       ];
       $first = FALSE;
-      $output = str_replace(SELF::TOKENS, $replace, SELF::TEMPLATE);
+      $output[] = str_replace(SELF::TOKENS, $replace, SELF::TEMPLATE);
     }
-    return $output;
+    return implode($output);
   }
 
 

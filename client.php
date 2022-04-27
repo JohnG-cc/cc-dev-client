@@ -15,7 +15,6 @@ $message_file = './messages.msg';
 set_error_handler('display_errors_warnings');
 set_exception_handler('print_exception_to_file')
 ?><body bgcolor="fafafa">
-
   Connected to: <?php print $node->url; ?> as <?php print $node->user(); ?>. <a href="index.php">Change...</a>
   <hr />
 <?php
@@ -423,7 +422,7 @@ function get_api_log() : string {
   $link = ' API: '
     . '<a href="'.$gitlablink.'" title="See the API formally described in OpenAPI format" target="_blank">Raw</a> | '
     . '<a href="'.$swaggerlink.'" title="Interact with the API in swaggerhub" target="_blank">Rendered</a>';
-  $link .= ' <a class = "collapsible" title="API calls and latest responses">Log</a>';
+  //$link .= ' <a class = "collapsible" title="API calls and latest responses">Log</a>';
   return $link;
 }
 
@@ -432,7 +431,7 @@ function topTransactions() {
   if (empty($node->acc)) {
     return;
   }
-  $transactions = [];
+  $top_transactions = [];
   // Show this user's actions at the top of the page.
   if (isset($_POST['newTransaction'])) {
     $fields = (object)[
@@ -444,9 +443,12 @@ function topTransactions() {
     ];
     $newT = NewTransaction::create($fields);
     try {
-      $t = $node->requester(TRUE)->submitNewTransaction($newT);
-      // $t is a transaction in 'full' format
-      $top_transactions[] = \CCClient\Transaction::create($t);
+      // depending on the transaction type/workflow, the result could be a transaction in 'full' format, needing confirmation, or nothing.
+      if ($t = $node->requester(TRUE)->submitNewTransaction($newT)) {
+        $transaction = \CCClient\Transaction::createFromJsonClass($t);
+        $top_transactions[] = $transaction;
+        clientAddInfo($transaction);
+      }
     }
     catch (\Exception $e) {
       clientAddError('Faileld to submit new transaction: '.$e->getMessage());
@@ -456,7 +458,6 @@ function topTransactions() {
     // Any other initiated transactions
     $top_transactions = get_filtered_transactions(['states'=> ['validated']], TRUE);
   }
-
   // for the current user to sign
   foreach (get_filtered_transactions(['states'=> ['pending']], TRUE) as $t) {
     if (in_array('completed', $t->transitions)) {
@@ -506,7 +507,6 @@ function clientAddError($message) {
   if (!is_string($message)) {
     $message = '<pre>'.print_r($message, 1).'</pre>';
   }
-  $message = str_replace('BoT', '<span title="Balance of Trade account">BoT</span>', $message);
   $info[] = '<font color="red">'.$message.'</font>';
 }
 
@@ -521,7 +521,6 @@ function clientAddInfo($message) {
     if (!is_string($message)) {
       $message = '<pre>'.print_r($message, 1).'</pre>';
     }
-    $message = str_replace('BoT', '<span title="Balance of Trade account">BoT</span>', $message);
     $info[] = '<font color="green">'.$message.'</font>';
   }
 }
@@ -586,7 +585,10 @@ function get_filtered_transactions(array $filters, bool $full = TRUE, $show = FA
   if (isset($filters['types']) and is_array($filters['types'])) {
     $filters['types'] = implode(',', $filters['types']);
   }
-  return $node->requester($show)->filterTransactions(array_filter($filters), $full);
+  if (!$full) {
+    $filters['entries'] = 'true';
+  }
+  return $node->requester($show)->filterTransactions(array_filter($filters));
 }
 
 function json_prettify(string $json) {

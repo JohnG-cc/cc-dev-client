@@ -35,21 +35,23 @@ class API extends \CreditCommons\Leaf\API {
 
   /**
    * @param array $fields
-   * @param bool $full
    * @return Transactioninterface[]
    */
-  public function filterTransactions(array $fields = [], bool $full = TRUE) : array {
+  public function filterTransactions(array $fields = [], $node_path = '') : array {
     try {
-      $results = parent::filterTransactions($fields, $full);
+      $results = parent::filterTransactions($fields, $node_path);
     }
     catch (CCError $e) {
       clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($fields) );
       $results = [];
     }
     $filtered = [];
-    $upcast_class = $full ? '\CCClient\Transaction::createFromJsonClass' : '\CreditCommons\StandaloneEntry::create';
+    $upcast_to_class = empty($fields['entries']) ? '\CCClient\Transaction::createFromJsonClass' : '\CreditCommons\StandaloneEntry::create';
     foreach ($results as $result) {
-      $filtered[] = $upcast_class($result);
+      foreach ($result->entries as &$row) {
+        $row->author = 'blah';
+      }
+      $filtered[] = $upcast_to_class($result);
     }
     return $filtered;
   }

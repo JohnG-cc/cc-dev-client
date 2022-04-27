@@ -107,7 +107,7 @@ class Node {
       $this->addAccountOnRootwardsNode($trunkward_url, $rate);
     }
     else {
-      clientAddInfo("$this->name has no trunkwards node");
+      clientAddInfo("$this->name has no trunkward node");
     }
   }
 
@@ -227,16 +227,16 @@ class Node {
    */
   function addAccountOnRootwardsNode($url, $rate = 1, $local = FALSE) : void {
     global $nodes;
-    if ($trunkwards_node_name = $this->checkRootwards($url) and isset($nodes[$trunkwards_node_name]) ) {
+    if ($trunkward_node_name = $this->checkRootwards($url) and isset($nodes[$trunkward_node_name]) ) {
       die('todo addAccountOnRootwardsNode');
-      $ini = ['bot_account' => $trunkwards_node_name, 'bot_rate' => $rate];
+      $ini = ['bot_account' => $trunkward_node_name, 'bot_rate' => $rate];
       $this->set($ini, 'ledger');
-      $this->addAccount($trunkwards_node_name, $url);
-      $nodes[$trunkwards_node_name]->addAccount($this->name, $this->url);
+      $this->addAccount($trunkward_node_name, $url);
+      $nodes[$trunkward_node_name]->addAccount($this->name, $this->url);
       // @todo change the above to this.
-      $code = $this->creditCommonsClient()->join($trunkwards_node_name, 'secret', $url);
+      $code = $this->creditCommonsClient()->join($trunkward_node_name, 'secret', $url);
       if ($code != 200) {
-        clientAddInfo("Unable to create new account on trunkwards node");
+        clientAddInfo("Unable to create new account on trunkward node");
       }
       //handshake the new account just to test.
       list ($code, $details) = $this->creditCommonsClient()->handshake();
@@ -248,7 +248,7 @@ class Node {
       }
     }
     else {
-      clientAddError("The trunkwards node $trunkwards_node_name does not exist.");
+      clientAddError("The trunkward node $trunkward_node_name does not exist.");
     }
   }
 
@@ -260,7 +260,7 @@ class Node {
    * Test the new (remote) url and retrive the node name
    * @param string $url
    * @return string
-   *   The name of the trunkwards node.
+   *   The name of the trunkward node.
    */
   private function checkRootwards(string $url) {
     // Peer certificate CN=`cavesoft.net' did not match expected CN=`ledger.demo.credcom.dev
@@ -286,7 +286,7 @@ class Node {
       print_r($http_response_header);
       return;
     }
-    clientAddError('Could not ping trunkwards node '.$url);
+    clientAddError('Could not ping trunkward node '.$url);
   }
 
   /**
