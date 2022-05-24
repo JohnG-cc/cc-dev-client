@@ -14,8 +14,9 @@ class Node {
     public string $key=''
   ) {
     $this->name = '$node_name';// There's no api call to retreive the node.
-    $this->handshake = $this->requester()->handshake();
-    $this->accountNames = $this->requester()->accountNameFilter();
+    if ($this->handshake = $this->requester()->handshake()) {
+      $this->accountNames = $this->requester()->accountNameFilter();
+    }
   }
 
   function requester(bool $show = FALSE) : API {
@@ -107,4 +108,33 @@ class Node {
     return $acc_ids;
   }
 
+}
+
+
+/**
+ *
+ * @global string $info
+ * @param mixed $message
+ */
+function clientAddError($message) {
+  global $info;
+  if (!is_string($message)) {
+    $message = '<pre>'.print_r($message, 1).'</pre>';
+  }
+  $info[] = '<font color="red">'.$message.'</font>';
+}
+
+/**
+ *
+ * @global string $info
+ * @param mixed $message
+ */
+function clientAddInfo($message) {
+  global $info;
+  if ($message) {
+    if (!is_string($message)) {
+      $message = '<pre>'.print_r($message, 1).'</pre>';
+    }
+    $info[] = '<font color="green">'.$message.'</font>';
+  }
 }

@@ -497,34 +497,6 @@ function formatStats($name, $data) {
   return $output.'</tbody></table>';
 }
 
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddError($message) {
-  global $info;
-  if (!is_string($message)) {
-    $message = '<pre>'.print_r($message, 1).'</pre>';
-  }
-  $info[] = '<font color="red">'.$message.'</font>';
-}
-
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddInfo($message) {
-  global $info;
-  if ($message) {
-    if (!is_string($message)) {
-      $message = '<pre>'.print_r($message, 1).'</pre>';
-    }
-    $info[] = '<font color="green">'.$message.'</font>';
-  }
-}
-
 function display_errors_warnings(int $errno , string $errstr, string $errfile, int $errline) {
   switch ($errno) {
     case E_NOTICE:

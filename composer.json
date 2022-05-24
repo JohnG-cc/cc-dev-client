@@ -12,13 +12,12 @@
       "role": "Maintainer"
     }
   ],
-  "repositories": {
-    "credcom-dev": {
-      "type": "path",
-      "url": "/home/matslats/Documents/CreditCommons/credit-commons-software-stack",
-      "options": { "symlink": true }
-    } 
-  },
+  "repositories": [
+    {
+      "type": "gitlab",
+      "url": "git@gitlab.com:credit-commons-software-stack/cc-php-lib.git"
+    }
+  ],
   "require": {
     "credit-commons-software-stack/cc-php-lib": "@dev"
   },

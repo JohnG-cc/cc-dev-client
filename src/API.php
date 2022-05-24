@@ -4,7 +4,8 @@ namespace CCClient;
 use GuzzleHttp\RequestOptions;
 use CreditCommons\StandaloneEntry;
 use CreditCommons\TransactionInterface;
-use \CCClient\Transaction;
+use CCClient\Transaction;
+use CreditCommons\Exceptions\DoesNotExistViolation;
 
 /**
  * Class for a non-ledger client to call to a credit commons accounting node.
@@ -19,6 +20,35 @@ class API extends \CreditCommons\Leaf\API {
    * @var bool
    */
   public bool $show;
+
+
+  public function handshake() : array {
+    try {
+      return parent::handshake();
+    }
+    catch (Throwable $ex) {
+      clientAddError($ex->makeMessage());
+      return [];
+    }
+  }
+
+  public function accountNameFilter(string $path_to_node = '', $limit = 10) : array {
+    try {
+      return parent::accountNameFilter($path_to_node, $limit);
+    }
+    catch (Throwable $ex) {
+      clientAddError($ex->makeMessage());
+    }
+  }
+
+  public function getOptions() : array {
+    try {
+      return parent::getOptions();
+    }
+    catch (Exception $ex) {
+      clientAddError($ex->makeMessage());
+    }
+  }
 
   function getWorkflows(): array {
     $results = [];
@@ -79,7 +109,7 @@ class API extends \CreditCommons\Leaf\API {
     try {
       $result = parent::request($required_code, $endpoint);
     }
-    catch(\Exception $e) {
+    catch(\Throwable $e) {
       echo $e->getMessage();
       $result = [];
     }

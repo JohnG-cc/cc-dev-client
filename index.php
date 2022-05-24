@@ -14,7 +14,7 @@
   </head><?php
     ini_set('display_errors', 1);
     require_once __DIR__ . '/vendor/autoload.php';
-    include 'Node.php';
+    include 'Node.php'; // why not a proper class?
     if ($_GET and isset($_GET['node'])) {
       try {
         $node = new Node($_GET['node'], $_GET['acc']??'', $_GET['key']??'');
@@ -24,18 +24,19 @@
           exit;
         }
       }
-      catch (\Exception $e) {
+      catch (\Throwable $e) {
         echo "Unable to connect to ".$_GET['node'].': '.$e->getMessage();
       }
     }
   ?>
   <body>
     <form method="get">
+      <?php if (file_exists('./client.ini'))extract(parse_ini_file('./client.ini')); ?>
       <p>Enter credentials for a credit commons node:</p>
       <p>
-        Node Url <input name="node" placeholder = "http://" /><br />
-        User ID <input name="acc" /><br />
-        Key <input name="key" />
+        Node Url <input name="node" placeholder = "http://" <?php if (isset($url)): ?>value="<?php print $url; ?>" <?php endif; ?>/><br />
+        User ID <input name="acc" /><?php if (isset($user)): ?>Choose from <?php print $user; endif; ?><br />
+        Key <input name="key" <?php if (isset($auth)): ?>value="<?php print $auth; ?>" <?php endif; ?> />
       </p>
       <input type="submit">
     </form>

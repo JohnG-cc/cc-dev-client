@@ -18,7 +18,7 @@ class Node {
   }
 
   function creditCommonsClient() {
-    return new ClientAPI($this->url, $_SESSION['user'] == 'anon' ? '' : $_SESSION['user'], 123);
+    return new ClientAPI($this->url, $_SESSION['user'] == '-anon-' ? '' : $_GET['acc'], $_GET['key']);
   }
 
   static function load($url) {
