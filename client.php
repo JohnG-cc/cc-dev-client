@@ -37,32 +37,27 @@ if ($_POST) {
   }
   elseif (isset($accountSummary)) {
     try {
-      if (substr($acc_path, -1) == '/') {
-        $node->requester(TRUE)->getAccountSummaries($acc_path);
-      }
-      else {
-        $node->requester(TRUE)->getAccountSummary($acc_path);
-      }
+      $node->requester(TRUE)->getAccountSummary($acc_path);
     }
     catch (\Exception $e) {
-      clientAddError("Failed to retrieve stats for account $acc_id: ".$e->makeMessage() );
+      clientAddError("Failed to retrieve stats for account $acc_path: ".$e->makeMessage() );
     }
   }
   elseif (isset($accountLimits)) {
     try {
-      $node->requester(TRUE)->getAccountLimits($acc_id);
+      $node->requester(TRUE)->getAccountLimits($acc_path);
     }
     catch (CCError $e) {
-      clientAddError("Failed to get limits of account $acc_id: ".$e->makeMessage() );
+      clientAddError("Failed to get limits of account $acc_path: ".$e->makeMessage() );
     }
   }
   elseif(isset($accountHistory)) {
     // Get the balances and times.
     try {
-      $node->requester(TRUE)->getAccountHistory($acc_id);
+      $node->requester(TRUE)->getAccountHistory($acc_path);
     }
     catch (CCError $e) {
-      clientAddError("Failed to get history of account $acc_id: ".$e->makeMessage() );
+      clientAddError("Failed to get history of account $acc_path: ".$e->makeMessage() );
     }
 
   }
@@ -94,7 +89,7 @@ if ($_POST) {
       clientAddError('Failed to get trunkward node names: '.$e->makeMessage() );
     }
   }
-}
+} 
 ?>
 
 <?php $tabs = render_tabs();
@@ -293,11 +288,11 @@ class MakeForm {
   }
 
   static function accountNameFilter(&$output) {
-    global $fragment, $accountNameFilter, $node;
+    global $fragment;
     $output[] = '<h3>View accounts</h3>';
     $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion.</p>';
     $output[] = '<p>Put a fragment of an accountname or path</p>';
-    $output[] = '<p>Fragment: <input name="fragment" class="required" value="'. $fragment .'" />';
+    $output[] = '<p>Fragment: <input name="fragment" class="required" value="'. $fragment .'" autocomplete="off" />';
     $output[] = '<input type = "submit"  name = "accountNameFilter" value = "Query"/></p>';
   }
 
@@ -338,7 +333,7 @@ class MakeForm {
       $history = (array)json_decode($raw_result);
       if (count($history) > 2) {
         require_once 'nodeviz.php';
-        $output[] = get_one_history_chart($acc_id, $history);
+        $output[] = get_one_history_chart($acc_path, $history);
       }
     }
     $output[] = '<p>A list of balances and times, starting with account creation.</p>';
@@ -417,7 +412,7 @@ function showInfo() : string {
 }
 
 function get_api_log() : string {
-  $gitlablink = "https://gitlab.com/credit-commons-software-stack/credit-commons-microservices/-/raw/master/docs/credit-commons-openapi-3.0.yml";
+  $gitlablink = "https://gitlab.com/credit-commons/credit-commons-microservices/-/raw/master/docs/credit-commons-openapi-3.0.yml";
   $swaggerlink = 'https://app.swaggerhub.com/apis/matslats/creditcommons/0.2';
   $link = ' API: '
     . '<a href="'.$gitlablink.'" title="See the API formally described in OpenAPI format" target="_blank">Raw</a> | '
@@ -441,9 +436,11 @@ function topTransactions() {
       'description' => trim($_POST['description']), // this is optional
       'type' => $_POST['type'] // this is optional
     ];
-    $newT = NewTransaction::create($fields);
+    ini_set('display_errors', 1);
+    $newT = NewTransaction::createFromLeaf($fields);
     try {
-      // depending on the transaction type/workflow, the result could be a transaction in 'full' format, needing confirmation, or nothing.
+      // Depending on the transaction type/workflow, the result could be a
+      // transaction in 'full' format, needing confirmation, or nothing.
       if ($t = $node->requester(TRUE)->submitNewTransaction($newT)) {
         $transaction = \CCClient\Transaction::createFromJsonClass($t);
         $top_transactions[] = $transaction;
@@ -458,14 +455,14 @@ function topTransactions() {
     // Any other initiated transactions
     $top_transactions = get_filtered_transactions(['states'=> ['validated']], TRUE);
   }
-  // for the current user to sign
+  // For the current user to sign
   foreach (get_filtered_transactions(['states'=> ['pending']], TRUE) as $t) {
     if (in_array('completed', $t->transitions)) {
       $top_transactions[] = $t;
     }
   }
   if ($top_transactions) {
-    print '<div class="attention" title="This box is just to show transactions requiring the current user\'s attention">Validated and pending transactions of '.$_GET['acc'];
+    print '<div class="attention" title="This box is just to show transactions requiring the current user\'s attention">Validated and pending transactions of '.$_GET['acc'].':';
     print makeTransactionSentences($top_transactions) .'</div>';
   }
 }

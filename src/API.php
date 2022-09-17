@@ -1,11 +1,12 @@
 <?php
 
 namespace CCClient;
+
 use GuzzleHttp\RequestOptions;
 use CreditCommons\StandaloneEntry;
 use CreditCommons\TransactionInterface;
 use CCClient\Transaction;
-use CreditCommons\Exceptions\DoesNotExistViolation;
+use CreditCommons\Exceptions\CCError;
 
 /**
  * Class for a non-ledger client to call to a credit commons accounting node.
@@ -54,34 +55,37 @@ class API extends \CreditCommons\Leaf\API {
     $results = [];
     $all_workflows = parent::getWorkflows();
     // The client doesn't want them keyed by hash.
-    foreach ($all_workflows as $node => $wfs) {
-      foreach ($wfs as $hash => $workflow) {
-        $results[$workflow->id] = $workflow;
-      }
+    foreach ($all_workflows as $hash => $workflow) {
+      $results[$workflow->id] = $workflow;
     }
     return $results;
   }
-
 
   /**
    * @param array $fields
    * @return Transactioninterface[]
    */
-  public function filterTransactions(array $fields = [], $node_path = '') : array {
+  public function filterTransactions(array $params = []): array {
     try {
-      $results = parent::filterTransactions($fields, $node_path);
+      $results = parent::filterTransactions($params);
     }
     catch (CCError $e) {
-      clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($fields) );
+      clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
       $results = [];
     }
     $filtered = [];
-    $upcast_to_class = empty($fields['entries']) ? '\CCClient\Transaction::createFromJsonClass' : '\CreditCommons\StandaloneEntry::create';
-    foreach ($results as $result) {
-      foreach ($result->entries as &$row) {
-        $row->author = 'blah';
+    if (empty($params['entries'])) {
+      foreach ($results as $result) {
+        foreach ($result->entries as &$row) {
+          $row->author = 'blah';
+        }
+        $filtered[] = \CCClient\Transaction::createFromJsonClass($result);
       }
-      $filtered[] = $upcast_to_class($result);
+    }
+    else {
+      foreach ($results as $result) {
+        $filtered[] = \CreditCommons\StandaloneEntry::create($result);
+      }
     }
     return $filtered;
   }
@@ -92,12 +96,15 @@ class API extends \CreditCommons\Leaf\API {
    *   Entry[] | TransactionInterface
    */
   public function getUpcastTransaction(string $uuid, bool $full = TRUE) : array|TransactionInterface {
-    $result = parent::getTransaction($uuid, $full);
     if ($full) {
+      $result = parent::getTransaction($uuid);
       return Transaction::create($result);
     }
-    foreach ($result as $e) {
-      $entries[] = StandaloneEntry::create($e);
+    else {
+      $result = parent::getTransactionEntries($uuid);
+      foreach ($result as $en) {
+        $entries[] = StandaloneEntry::create($en);
+      }
     }
     return $entries;
   }
@@ -109,8 +116,12 @@ class API extends \CreditCommons\Leaf\API {
     try {
       $result = parent::request($required_code, $endpoint);
     }
+    catch(CCError $e) {
+      echo '<font color=red>'.$e->makeMessage().'</font>';
+      $result = [];
+    }
     catch(\Throwable $e) {
-      echo $e->getMessage();
+      echo '<font color=red>'.$e->getMessage().'</font>';
       $result = [];
     }
     if ($this->show) {

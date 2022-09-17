@@ -1,5 +1,5 @@
 {
-  "name": "credit-commons-software-stack/cc_client",
+  "name": "credit-commons/cc-client",
   "description": "Browser client implementing the credit commons protocol, for development purposes",
   "license": "GPL-2.0+",
   "homepage": "https://creditcommons.net",
@@ -12,14 +12,8 @@
       "role": "Maintainer"
     }
   ],
-  "repositories": [
-    {
-      "type": "gitlab",
-      "url": "git@gitlab.com:credit-commons-software-stack/cc-php-lib.git"
-    }
-  ],
   "require": {
-    "credit-commons-software-stack/cc-php-lib": "@dev"
+    "credit-commons/cc-php-lib": "@dev"
   },
   "autoload": {
     "psr-4": { "CCClient\\": "src"}

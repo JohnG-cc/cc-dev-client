@@ -7,8 +7,8 @@
     <script src="https://code.jquery.com/ui/1.13.1/jquery-ui.js"></script>
     <script>
       // Of course printing passwords in url or the html is not advised!
-      var ccuser = "<?php print $_GET['acc'];?>";
-      var ccauth = "<?php print $_GET['key'];?>";
+      var ccuser = "<?php print $_GET['acc']??'';?>";
+      var ccauth = "<?php print $_GET['key']??'';?>";
     </script>
     <script type="text/javascript" src="src/script.js"></script>
   </head><?php
@@ -24,6 +24,9 @@
           exit;
         }
       }
+      catch (\CreditCommons\Exceptions\CCError $e) {
+        echo "Unable to connect to ".$_GET['node'].': '.$e->makeMessage();
+      }
       catch (\Throwable $e) {
         echo "Unable to connect to ".$_GET['node'].': '.$e->getMessage();
       }
@@ -35,7 +38,7 @@
       <p>Enter credentials for a credit commons node:</p>
       <p>
         Node Url <input name="node" placeholder = "http://" <?php if (isset($url)): ?>value="<?php print $url; ?>" <?php endif; ?>/><br />
-        User ID <input name="acc" /><?php if (isset($user)): ?>Choose from <?php print $user; endif; ?><br />
+        User ID <input name="acc" value="<?php print $_GET['acc'] ?? '';?>" /><?php if (isset($user)): ?>Choose from <?php print $user; endif; ?><br />
         Key <input name="key" <?php if (isset($auth)): ?>value="<?php print $auth; ?>" <?php endif; ?> />
       </p>
       <input type="submit">

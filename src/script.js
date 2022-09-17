@@ -35,7 +35,7 @@ $( function() {
   $( ".accountnames" ).autocomplete({
     source: function( request, response ) {
       $.ajax( {
-        url: "http://ccleaf/accounts/names/"+request.term,
+        url: "http://ccleaf/account/names/"+request.term,
         dataType: "json",
         contentType: "application/json;  charset=utf-8",
         headers: {

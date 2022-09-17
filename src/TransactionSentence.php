@@ -29,7 +29,7 @@ class TransactionSentence {
         $entry->payer,
         $entry->quant,
         $entry->description,
-        $first ? $this->actionLinks() : ''
+        $first ? $this->transaction->actionLinks() : ''
       ];
       $first = FALSE;
       $output[] = str_replace(SELF::TOKENS, $replace, SELF::TEMPLATE);
@@ -58,12 +58,12 @@ class TransactionSentence {
         $output[] = '</form>';
       }
       else {
-        clientAddError("Missing workflow: $this->transaction->type:");
+        clientAddError("Missing workflow: ".$this->transaction->type);
       }
     }
     else {
       $type = $this->transaction->type;
-      $output[] = "<span title = \"".$_GET['acc']." is not permittions to do anything to this '$type' transaction\">(No transitions)</span>";
+      $output[] = "<span title = \"".$_GET['acc']." is not permittions to do anything to this '$type' transaction\">(no actions)</span>";
     }
     return implode($output);
   }
