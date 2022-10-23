@@ -30,24 +30,3 @@ for (i = 0; i < coll.length; i++) {
   });
 }
 
-$( function() {
-  // auto-complete using jquery
-  $( ".accountnames" ).autocomplete({
-    source: function( request, response ) {
-      $.ajax( {
-        url: "http://ccleaf/account/names/"+request.term,
-        dataType: "json",
-        contentType: "application/json;  charset=utf-8",
-        headers: {
-          'cc-user': ccuser,
-          'cc-auth': ccauth
-        },
-       //data: {fragment: request.term},
-        success: function( data ) {
-          response( data );
-        }
-      } );
-    },
-    minLength: 1,
-  } );
-} );

@@ -4,7 +4,6 @@ namespace CCClient;
 
 use GuzzleHttp\RequestOptions;
 use CreditCommons\StandaloneEntry;
-use CreditCommons\TransactionInterface;
 use CCClient\Transaction;
 use CreditCommons\Exceptions\CCError;
 
@@ -14,7 +13,7 @@ use CreditCommons\Exceptions\CCError;
  * appropriate for the client.
  * Clients should instantiate this
  */
-class API extends \CreditCommons\Leaf\API {
+class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
 
   /**
    * TRUE if this is the main query to be printed in the CCClient.
@@ -62,67 +61,84 @@ class API extends \CreditCommons\Leaf\API {
   }
 
   /**
-   * @param array $fields
-   * @return Transactioninterface[]
+   * @param array $params
+   * @return array
+   *   Transactioninterface[], transitions & links
    */
   public function filterTransactions(array $params = []): array {
     try {
-      $results = parent::filterTransactions($params);
+      // we don't care about the pager $links (missing 3rd param)
+      [$transactions, $transitions] = parent::filterTransactions($params);
+    }
+    catch (CCError $e) {
+      clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
+      $transactions = [];
+    }
+    $filtered = [];
+    foreach ($transactions as $trans) {
+      foreach ($trans->entries as &$row) {
+        $row->author = $this->nodeName;
+      }
+      $actions = (array)$transitions->{$trans->uuid};
+      $filtered[] = \CCClient\Transaction::createFromJsonClass($trans, $actions);
+    }
+    return $filtered;
+  }
+
+
+  public function filterTransactionEntries(array $params = []): array {
+    try {
+      [$items, $links] = parent::filterTransactionEntries($params);
     }
     catch (CCError $e) {
       clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
       $results = [];
     }
     $filtered = [];
-    if (empty($params['entries'])) {
-      foreach ($results as $result) {
-        foreach ($result->entries as &$row) {
-          $row->author = 'blah';
-        }
-        $filtered[] = \CCClient\Transaction::createFromJsonClass($result);
-      }
+    foreach ($items as $entry) {
+      $filtered[] = \CreditCommons\StandaloneEntry::create($entry);
     }
-    else {
-      foreach ($results as $result) {
-        $filtered[] = \CreditCommons\StandaloneEntry::create($result);
-      }
-    }
-    return $filtered;
+    return [$filtered, $links];
   }
 
   /**
-   * Upcast the results
-   * @return
-   *   Entry[] | TransactionInterface
+   * Upcast the result transactions. NB this NOT part of the API.
+   * @return array
+   *   The transactions and the transitions.
    */
-  public function getUpcastTransaction(string $uuid, bool $full = TRUE) : array|TransactionInterface {
-    if ($full) {
-      $result = parent::getTransaction($uuid);
-      return Transaction::create($result);
+  public function getUpcastTransaction(string $uuid) : array {
+    [$transaction, $transitions] = parent::getTransaction($uuid);
+    $transaction->scribe = 'trunkward node'; // This required property needs handling better.
+    return [Transaction::create($transaction), $transitions];
+  }
+
+  /**
+   * Upcast the result entries. NB this NOT part of the API.
+   * @return array
+   *   The transactions and the transitions.
+   */
+  public function getUpcastEntries(string $uuid) : array {
+    $entries = parent::getTransactionEntries($uuid);
+    foreach ($entries as $en) {
+      $entries[] = StandaloneEntry::create($en);
     }
-    else {
-      $result = parent::getTransactionEntries($uuid);
-      foreach ($result as $en) {
-        $entries[] = StandaloneEntry::create($en);
-      }
-    }
-    return $entries;
+    return [$entries];
   }
 
   /**
    * Print the request if needed.
    */
-  protected function request(int $required_code, string $endpoint = '') {
+  protected function request(int $required_code, string $endpoint = '/') :\stdClass|NULL {
     try {
       $result = parent::request($required_code, $endpoint);
     }
     catch(CCError $e) {
       echo '<font color=red>'.$e->makeMessage().'</font>';
-      $result = [];
+      $result = NULL;
     }
     catch(\Throwable $e) {
       echo '<font color=red>'.$e->getMessage().'</font>';
-      $result = [];
+      $result = NULL;
     }
     if ($this->show) {
       // See client.php display_errors_warnings() to see how this is handled specially.
@@ -143,7 +159,7 @@ class API extends \CreditCommons\Leaf\API {
   /**
    * {@inheritdoc}
    */
-  protected function processResponse($response, int $required_code) {
+  protected function processResponse($response, int $required_code) : \stdClass|NULL {
     global $raw_result;
     $contents = $response->getBody()->getContents();// not prettified
     if ($this->show){

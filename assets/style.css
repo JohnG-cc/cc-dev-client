@@ -3,16 +3,17 @@ div, form{vertical-align: top;}
 form, div.method{ padding:0.5em; background-color: #eee;}
 div.messages{background-color:#ccc; padding:0 1em;}
 div.log{background-color:#000; color: #fff; padding:0 1em;}
-div.feedback{background-color:#eee; padding:1em; border-color:green;}
+div.feedback{margin-left: 180px;}
 .required::after {content:'*';color:red;}
 form.inline{padding:0;display:inline;background-color:transparent;}
 .link-button {border: none; color: blue; text-decoration: underline; cursor: pointer; background-color:transparent;}
 .link-button:focus {outline: none;}
 .link-button:active {color:red;}
-div.dependent{padding-left:1em;}
+div.dependent{left: 1em; position: relative;}
 div.pending{color:#f44;}
 div.validated{color:#f44;}
 div.completed{color:#000;}
+div.sentence{font-size: 85%;}
 div.erased{color:#888;}
 div.primary{font-weight:bold;}
 div.balance-charts div{display:inline-block;}
@@ -22,15 +23,19 @@ div.attention{border:medium solid #ffbbbb; margin:10px; padding:10px; background
 /**
  * Tabs
  */
-div.service{display:none; padding:0.5em; background-color: #ddd;}
-div.service.front{display:block;}
 form.front{display:block;}
-div form, div.method{display:none;}
-div.method.front{display:block;}
-div.bigtab{display:inline-block; background-color: #aaa;padding: 0.5em; margin-left:3px; border-radius: 7px 7px 0 0;cursor: pointer;}
-div.bigtab.front{background-color: #ddd;}
-div.littletab{display:inline-block; background-color: #ddd;padding: 0.3em; border:thin solid #eee;border-radius: 5px 5px 0 0;font-size: 85%; cursor: pointer;}
-div.littletab.front{background-color: #eee;}
+.method{display:none;}
+form.method.front{display:block;}
+table.tabs {float:left;}
+td.tab{
+    background-color: #ddd;
+    padding: 0.3em 0.5em;
+    border: thin solid #eee;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+    clear: left; 
+}
+td.tab.front{background-color: #eee;}
 div.balance-charts{margin:0.5em 0;}
 div.history-chart{float:right;}
 
@@ -52,3 +57,5 @@ ul.ui-menu {
   list-style-type: none;
   background-color: white;
 }
+
+h4 {margin: 0.5em 0;}

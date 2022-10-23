@@ -7,7 +7,7 @@
  */
 
 use CCClient\Transaction;
-use CreditCommons\Leaf\NewTransaction;
+use CreditCommons\NewTransaction;
 use CreditCommons\Exceptions\CCError;
 
 $message_file = './messages.msg';
@@ -22,11 +22,22 @@ global $errorfield;
 if ($_POST) {
   extract($_POST);
   if (isset($filterTransactions)) {
-    get_filtered_transactions($_POST, $filterTransactions == 'Full transactions', TRUE);
+    get_filtered_transactions($_POST, TRUE);
+  }
+  if (isset($filterTransactionEntries)) {
+    get_filtered_entries($_POST, TRUE);
   }
   elseif (isset($getTransaction)) {
     try {
-      $node->requester(TRUE)->getUpcastTransaction($uuid, $format == 'full'? TRUE : FALSE);
+      $node->requester(TRUE)->getUpcastTransaction($uuid);
+    }
+    catch (CCError $e) {
+      clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
+    }
+  }
+  elseif (isset($getEntries)) {
+    try {
+      $node->requester(TRUE)->getUpcastEntries($uuid);
     }
     catch (CCError $e) {
       clientAddError("Unable to retrieve transaction $uuid: ".$e->makeMessage() );
@@ -89,9 +100,16 @@ if ($_POST) {
       clientAddError('Failed to get trunkward node names: '.$e->makeMessage() );
     }
   }
-} 
+  elseif (isset($convertPrice)) {
+    try {
+      $ratio = $node->requester(TRUE)->convertPrice($pricenode);
+    }
+    catch (CCError $e) {
+      clientAddError('Failed to get price ratio: '.$e->makeMessage() );
+    }
+  }
+}
 ?>
-
 <?php $tabs = render_tabs();
 print topTransactions(); ?>
   <?php if (isset($node)) : ?>
@@ -128,19 +146,22 @@ function render_tabs() {
   if (!isset($front_op)) {
     $front_op = reset($operationIds);
   }
+  $tab_rows[] = '<tr><td title="These are the names of the endpoints corresponding to the openapi documentation">Methods >></td></tr>';
   foreach ($operationIds as $method) {
     $output[] = get_method_form($method, $front_op==$method);
-    $but_att = [
-      'onclick' => ["openTab(event,'.littletab','.method','$method')"],
-      'class' => ['littletab'],// front?
+    $attr = [
+      'onclick' => ["openTab(event,'.tab','.method','$method')"],
+      'class' => ['tab'],// front?
     ];
     if ($front_op==$method) {
-      $but_att['class'][] = 'front';
+      $attr['class'][] = 'front';
     }
-    $buttons[] = getDivTag($but_att, $method);
+    $tab_rows[] = '<tr>'.makeHtmlBlock('td', $method, $attr).'</tr>';
   }
-  array_unshift($buttons, '<div style="display:inline-block; padding: 0.3em; font-size:85%;" title="These are the names of the endpoints corresponding to the openapi documentation">Methods >></div>');
-  return getDivTag([], implode($buttons).implode("\n", $output).'<br />'.get_api_log());
+  $tab_rows[] = '<tr><td>'.get_api_log().'</td></tr>';
+  $functions_table = '<table class="tabs">'.implode($tab_rows).'</table>';
+
+  return $functions_table.implode("\n", $output);
 }
 
 /**
@@ -159,7 +180,7 @@ function get_method_form($method, $is_front) {
     $attributes['class'][] ='front';
   }
   if ($method == 'stateChange') {
-    return getDivTag($attributes, implode($form_lines));
+    return makeHtmlBlock('div', implode($form_lines), $attributes);
   }
   else {
     $output = '';
@@ -171,6 +192,14 @@ function get_method_form($method, $is_front) {
 }
 
 class MakeForm {
+
+  static function convertPrice(&$output) {
+    global $pricenode, $convertPrice;
+    $output[] = '<h3>Convert price</h3>';
+    $output[] = '<p>Get the ratio of the unit of value on a remote node compare the current node</p>';
+    $output[] = '<input name = "pricenode" class = "required" value= "'. $pricenode .'" />';
+    $output[] = '<input type = "submit" name = "convertPrice" value = "Create" />';
+  }
 
   static function permittedEndPoints(&$output) {
     global $node, $request_options;
@@ -214,7 +243,7 @@ class MakeForm {
 
   static function stateChange(&$output) {
     global $stateChange, $node;
-    if ($t_pending = get_filtered_transactions(['states' => ['pending']], TRUE)) {
+    if ($t_pending = get_filtered_transactions(['states' => ['pending']])) {
       $output[] = '<h4>Incomplete Transactions:</h4>';
       foreach ($t_pending as $t) {
         // show only the pending transactions the current user doesn't have to sign.
@@ -224,12 +253,13 @@ class MakeForm {
         }
       }
     }
-    if ($t_completed = get_filtered_transactions(['states' => ['completed']], TRUE)) {
+    if ($t_completed = get_filtered_transactions(['states' => ['completed']])) {
       $output[] = '<h4>Completed Transactions:</h4>';
       $output[] = makeTransactionSentences($t_completed);
     }
     // Get all the transactions on the ledger
-    if ($t_erased = get_filtered_transactions(['states' => ['erased']], TRUE)) {
+
+    if ($t_erased = get_filtered_transactions(['states' => ['erased']])) {
       $output[] = '<h4>Erased Transactions:</h4>';
       $output[] = makeTransactionSentences($t_erased);
     }
@@ -243,10 +273,14 @@ class MakeForm {
     $output[] = '<h3>Get a Transaction</h3>';
     $output[] = '<br /><label>Uuid</label>';
     $output[] = '<input type="textfield" name="uuid""/>';
-    $output[] = '<p><label>Format</label>';
-    $output[] = '<br /><input type="radio" name="format" value="full" checked>Full';
-    $output[] = '<br /><input type="radio" name="format" value="entry">Flat</p>';
     $output[] = '<br /><input type = "submit" name = "getTransaction" value="View" />';
+  }
+  static function getEntries(&$output) {
+    global $uuid, $getEntries;
+    $output[] = '<h3>Get entries of a transaction</h3>';
+    $output[] = '<br /><label>Uuid</label>';
+    $output[] = '<input type="textfield" name="uuid""/>';
+    $output[] = '<br /><input type = "submit" name = "getEntries" value="View" />';
   }
 
   static function filterTransactions(&$output) {
@@ -255,36 +289,61 @@ class MakeForm {
     $states = (array)$states;
     $output[] = '<h3>Filter Transactions</h3>';
     $output[] = '<p>See any transaction on this node (no access control for members)</p>';
-    $output[] = '<br /><label>Payee</label>';
+    $output[] = '<label>Payee</label>';
     $output[] = '<input type="textfield" name="payee"/>';
-    $output[] = '<br /><label>Payer</label>';
+    $output[] = '<p><label>Payer</label>';
     $output[] = '<input type="textfield" name="payer""/>';
-    $output[] = '<br /><label>Either payee or payer</label>';
+    $output[] = '<p><label>Either payee or payer</label>';
     $output[] = '<input type="textfield" name="involving" value="'.$involving.'"/>';
-    $output[] = '<br /><label>Workflow states</label>';
-    $output[] = '<select name = "states" multiple>';
-    $output[] = '  <option value="completed" '.(in_array('completed', $states) ? "selected" : '').'>Completed</option>';
-    $output[] = '  <option value="pending" '.(in_array('pending', $states) ? "selected" : '').'>Pending</option>';
-    $output[] = '  <option value="erased" '.(in_array('erased', $states) ? "selected" : '').'>Erased</option>';
-    $output[] = '  <option value="validated" '.(in_array('validated', $states) ? "selected" : '').'>Validated (visible only to author)</option>';
-    $output[] = '</select><br />';
-    $output[] = '<br /><label>Workflow types</label>';
-    $output[] = '<select name = "types" multiple>';
+    $output[] = '<p><label>Workflow states:</label>';
+    $output[] = '<input type="checkbox" id="state-completed" name="states[completed]" value="completed"'.(in_array('completed', $states) ? "checked" : '').'>completed ';
+    $output[] = '<input type="checkbox" id="state-pending" name="states[pending]" value="pending"'.(in_array('pending', $states) ? "checked" : '').'> pending';
+    $output[] = '<input type="checkbox" id="state-erased" name="states[erased]" value="erased"'.(in_array('erased', $states) ? "checked" : '').'>erased';
+    $output[] = '<input type="checkbox" id="state-validated" name="states[validated]" value="validated"'.(in_array('validated', $states) ? "checked" : '').'>validated';
+    $output[] = '<p><label>Workflow types</label>';
     // todo read these from the workflow
-    $output[] = '  <option value="default" '.(in_array('default', $types) ? "selected" : '').'>Default</option>';
-    $output[] = '  <option value="bill" '.(in_array('bill', $types) ? "selected" : '').'>Bill</option>';
-    $output[] = '  <option value="credit" '.(in_array('credit', $types) ? "selected" : '').'>Credit</option>';
-    $output[] = '  <option value="3rdparty" '.(in_array('3rdparty', $types) ? "selected" : '').'>3rd Party</option>';
-    $output[] = '</select>';
-    $output[] = '<br /><label>Updated Before</label>';
+    $output[] = '<input type="checkbox" id="type-bill" name="types[bill]" value="bill"'.(in_array('bill', $types) ? "checked" : '').'>Bill ';
+    $output[] = '<input type="checkbox" id="type-credit" name="types[credit]" value="credit"'.(in_array('credit', $types) ? "checked" : '').'>Credit ';
+    $output[] = '<input type="checkbox" id="type-3rdparty" name="types[3rdparty]" value="3rdparty"'.(in_array('3rdparty', $types) ? "checked" : '').'>3rdparty ';
+    $output[] = '<p><label>Updated Before</label>';
     $output[] = '<input type="date" name="before" value = "'.$before.'"/>';
-    $output[] = '<br /><label>Updated After</label>';
+    $output[] = '<p><label>Updated After</label>';
     $output[] = '<input type="date" name="after" value = "'.$after.'"/>';
-    $output[] = '<br /><label>Description</label>';
+    $output[] = '<p><label>Description contains</label>';
     $output[] = '<input type="textfield" name="description" />';
-    $output[] = '<br /><input type = "submit" name = "filterTransactions" value="Full transactions" />';
-    $output[] = '<input type = "submit" name = "filterTransactions" value="Standalone entries" />';
-    $output[] = ' (There may be more filters detailed in the API documentation)';
+    $output[] = '<p><input type = "submit" name = "filterTransactions" value="Full transactions" />';
+    $output[] = '<p>(Check API documentation for a full list of filters)';
+  }
+  static function filterTransactionEntries(&$output) {
+    global $payer, $payee, $involving, $uuid, $states, $types, $before, $after, $description, $format, $filterTransactions;
+    $types = (array)$types;
+    $states = (array)$states;
+    $output[] = '<h3>Filter Transactions</h3>';
+    $output[] = '<p>See any transaction on this node (no access control for members)</p>';
+    $output[] = '<label>Payee</label>';
+    $output[] = '<input type="textfield" name="payee"/>';
+    $output[] = '<p><label>Payer</label>';
+    $output[] = '<input type="textfield" name="payer""/>';
+    $output[] = '<p><label>Either payee or payer</label>';
+    $output[] = '<input type="textfield" name="involving" value="'.$involving.'"/>';
+    $output[] = '<p><label>Workflow states:</label>';
+    $output[] = '<input type="checkbox" id="state-completed" name="states[completed]" value="completed"'.(in_array('completed', $states) ? "checked" : '').'>completed ';
+    $output[] = '<input type="checkbox" id="state-pending" name="states[pending]" value="pending"'.(in_array('pending', $states) ? "checked" : '').'> pending';
+    $output[] = '<input type="checkbox" id="state-erased" name="states[erased]" value="erased"'.(in_array('erased', $states) ? "checked" : '').'>erased';
+    $output[] = '<input type="checkbox" id="state-validated" name="states[validated]" value="validated"'.(in_array('validated', $states) ? "checked" : '').'>validated';
+    $output[] = '<p><label>Workflow types</label>';
+    // todo read these from the workflow
+    $output[] = '<input type="checkbox" id="type-bill" name="types[bill]" value="bill"'.(in_array('bill', $types) ? "checked" : '').'>Bill ';
+    $output[] = '<input type="checkbox" id="type-credit" name="types[credit]" value="credit"'.(in_array('credit', $types) ? "checked" : '').'>Credit ';
+    $output[] = '<input type="checkbox" id="type-3rdparty" name="types[3rdparty]" value="3rdparty"'.(in_array('3rdparty', $types) ? "checked" : '').'>3rdparty ';
+    $output[] = '<p><label>Updated Before</label>';
+    $output[] = '<input type="date" name="before" value = "'.$before.'"/>';
+    $output[] = '<p><label>Updated After</label>';
+    $output[] = '<input type="date" name="after" value = "'.$after.'"/>';
+    $output[] = '<p><label>Description contains</label>';
+    $output[] = '<input type="textfield" name="description" />';
+    $output[] = '<p><input type = "submit" name = "filterTransactionEntries" value="Standalone entries" />';
+    $output[] = '<p>(Check API documentation for a full list of filters)';
   }
 
   static function accountNameFilter(&$output) {
@@ -308,16 +367,16 @@ class MakeForm {
     global $acc_path, $accountSummary, $raw_result;
     $output[] = '<h3>View account(s) summary</h3>';
     $output[] = '<p>Trading statistics</p>';
-    if ($accountSummary and $stats = json_decode($raw_result)) {
-      if (isset($stats->pending)) {
-        $output[] = formatStats($acc_path, $stats);
-      }
-      else {
-        foreach ($stats as $name => $stats) {
-          $output[] = formatStats($name, $stats);
-        }
-      }
-    }
+//    if ($accountSummary and $stats = json_decode($raw_result)->data) {
+//      if (isset($stats->pending)) {
+//        $output[] = formatStats($acc_path, $stats);
+//      }
+//      else {
+//        foreach ($stats as $name => $stats) {
+//          $output[] = formatStats($name, $stats);
+//        }
+//      }
+//    }
     $output[] = '<br /><label class=required >Account name or path</label>';
     $output[] = selectAccount('acc_path', $acc_path, NULL, TRUE).'<br />';
     $output[] = 'Use relative paths to explore other nodes.';
@@ -356,12 +415,12 @@ class MakeForm {
 
 }
 
-function getDivTag(array $attributes, $content) {
+function makeHtmlBlock($tag_name, $content, array $attributes  = []) : string {
   $atts = [];
   foreach ($attributes as $at => $vals) {
     $atts[] = $at .'="'.implode(' ', $vals).'"';
   }
-  return '<div '.implode(' ', $atts) .'>'.$content.'</div>';
+  return "<$tag_name ".implode(' ', $atts) .">$content</$tag_name>";
 }
 
 function wrapInFormTags($attributes, $content) {
@@ -412,12 +471,8 @@ function showInfo() : string {
 }
 
 function get_api_log() : string {
-  $gitlablink = "https://gitlab.com/credit-commons/credit-commons-microservices/-/raw/master/docs/credit-commons-openapi-3.0.yml";
-  $swaggerlink = 'https://app.swaggerhub.com/apis/matslats/creditcommons/0.2';
-  $link = ' API: '
-    . '<a href="'.$gitlablink.'" title="See the API formally described in OpenAPI format" target="_blank">Raw</a> | '
-    . '<a href="'.$swaggerlink.'" title="Interact with the API in swaggerhub" target="_blank">Rendered</a>';
-  //$link .= ' <a class = "collapsible" title="API calls and latest responses">Log</a>';
+  $gitlablink = "https://gitlab.com/credit-commons/cc-php-lib/-/blob/master/docs/credit-commons-v0.2.openapi3.yml";
+  $link = '<a href="'.$gitlablink.'" title="See the API formally described in OpenAPI format" target="_blank">OpenAPI spec</a>';
   return $link;
 }
 
@@ -437,12 +492,13 @@ function topTransactions() {
       'type' => $_POST['type'] // this is optional
     ];
     ini_set('display_errors', 1);
-    $newT = NewTransaction::createFromLeaf($fields);
+    $newT = NewTransaction::create($fields);
     try {
       // Depending on the transaction type/workflow, the result could be a
       // transaction in 'full' format, needing confirmation, or nothing.
-      if ($t = $node->requester(TRUE)->submitNewTransaction($newT)) {
-        $transaction = \CCClient\Transaction::createFromJsonClass($t);
+      [$transaction_data, $transitions] = $node->requester(TRUE)->submitNewTransaction($newT);
+      if ($transaction_data) {
+        $transaction = \CCClient\Transaction::createFromJsonClass($transaction_data, $transitions);
         $top_transactions[] = $transaction;
         clientAddInfo($transaction);
       }
@@ -453,10 +509,11 @@ function topTransactions() {
   }
   else {
     // Any other initiated transactions
-    $top_transactions = get_filtered_transactions(['states'=> ['validated']], TRUE);
+    $top_transitions = get_filtered_transactions(['states'=> ['validated']]);
   }
   // For the current user to sign
-  foreach (get_filtered_transactions(['states'=> ['pending']], TRUE) as $t) {
+  $pending = get_filtered_transactions(['states'=> ['pending']]);
+  foreach ($pending as $t) {
     if (in_array('completed', $t->transitions)) {
       $top_transactions[] = $t;
     }
@@ -475,8 +532,13 @@ function topTransactions() {
 function makeTransactionSentences(array $transactions) : string {
   $output = '';
   foreach ($transactions as $t) {
-    $sentence = new CCClient\TransactionSentence($t);
-    $output .= $sentence;
+    if ($t instanceOf \CCClient\Transaction) {
+      $sentence = new \CCClient\TransactionSentence($t);
+      $output .= $sentence;
+    }
+    else {
+      $sentence = new CCClient\TransactionEntrySentence($t);
+    }
   }
   return $output;
 }
@@ -546,7 +608,7 @@ function get_all_workflows(bool $show = FALSE) : array {
 }
 
 
-function get_filtered_transactions(array $filters, bool $full = TRUE, $show = FALSE) : array {
+function get_filtered_transactions(array $filters, $show = FALSE) : array {
   global $node;
   if (isset($filters['states']) and is_array($filters['states'])) {
     $filters['states'] = implode(',', $filters['states']);
@@ -554,10 +616,18 @@ function get_filtered_transactions(array $filters, bool $full = TRUE, $show = FA
   if (isset($filters['types']) and is_array($filters['types'])) {
     $filters['types'] = implode(',', $filters['types']);
   }
-  if (!$full) {
-    $filters['entries'] = 'true';
-  }
   return $node->requester($show)->filterTransactions(array_filter($filters));
+}
+
+function get_filtered_entries(array $filters, $show = FALSE) : array {
+  global $node;
+  if (isset($filters['states']) and is_array($filters['states'])) {
+    $filters['states'] = implode(',', $filters['states']);
+  }
+  if (isset($filters['types']) and is_array($filters['types'])) {
+    $filters['types'] = implode(',', $filters['types']);
+  }
+    return $node->requester($show)->filterTransactionEntries(array_filter($filters));
 }
 
 function json_prettify(string $json) {

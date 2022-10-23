@@ -1,6 +1,6 @@
 <?php
 
-use CCClient\API;
+use CCClient\LeafRequester;
 
 class Node {
 
@@ -19,8 +19,8 @@ class Node {
     }
   }
 
-  function requester(bool $show = FALSE) : API {
-    $requester = new API($this->url, $this->acc, $this->key);
+  function requester(bool $show = FALSE) : LeafRequester {
+    $requester = new LeafRequester($this->url, $this->acc, $this->key);
     $requester->show = $show;
     return $requester;
   }
@@ -109,7 +109,6 @@ class Node {
   }
 
 }
-
 
 /**
  *

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <title>Credit Commons client</title>
-    <link type="text/css" rel="stylesheet" href="src/style.css" media="all" />
+    <link type="text/css" rel="stylesheet" href="/assets/style.css" media="all" />
     <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
     <script src="https://code.jquery.com/ui/1.13.1/jquery-ui.js"></script>
     <script>
@@ -10,7 +10,7 @@
       var ccuser = "<?php print $_GET['acc']??'';?>";
       var ccauth = "<?php print $_GET['key']??'';?>";
     </script>
-    <script type="text/javascript" src="src/script.js"></script>
+    <script type="text/javascript" src="/assets/script.js"></script>
   </head><?php
     ini_set('display_errors', 1);
     require_once __DIR__ . '/vendor/autoload.php';

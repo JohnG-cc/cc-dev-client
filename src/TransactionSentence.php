@@ -1,19 +1,19 @@
 <?php
 
 namespace CCClient;
-use \CreditCommons\TransactionInterface;
+use \CCClient\Transaction;
 
 /**
  * Class for the client to handle responses with Transactions.
  */
 class TransactionSentence {
 
-  const TEMPLATE = '<div class = "@class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
+  const TEMPLATE = '<div class = "sentence @class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
   const TOKENS = ['@class', '@state', '@payee', '@payer', '@quant', '@description', '@links'];
   private array $workflows;
 
   function __construct(
-    private TransactionInterface $transaction
+    private Transaction $transaction
   ) {
     $this->workflows = get_all_workflows();
   }
@@ -25,11 +25,11 @@ class TransactionSentence {
       $replace = [
         $first ? "primary" : "dependent",
         $this->transaction->state,
-        $entry->payee, // NB these are spoofed account objects, see CreditCommons\Entry::Create
+        $entry->payee, // NB these are mock account objects, see CreditCommons\Entry::Create
         $entry->payer,
         $entry->quant,
         $entry->description,
-        $first ? $this->transaction->actionLinks() : ''
+        $first ? $this->actionLinks() : ''
       ];
       $first = FALSE;
       $output[] = str_replace(SELF::TOKENS, $replace, SELF::TEMPLATE);
@@ -47,12 +47,14 @@ class TransactionSentence {
    */
   function actionLinks() : string {
     global $node, $user;
-    if ($actions = $this->transaction->transitions) {
+    if ($this->transaction->transitions) {
       $output[] = '<form method="post" class="inline" action="">';
       $output[] = '<input type="hidden" name="uuid" value="'.$this->transaction->uuid.'">';
 
       if (isset($this->workflows[$this->transaction->type])) {
-        foreach ($this->workflows[$this->transaction->type]->actionLabels($this->transaction->state, $actions) as $target_state => $label) {
+        $workflow = $this->workflows[$this->transaction->type];
+        $labels = $workflow->actionLabels($this->transaction->state, array_keys($this->transaction->transitions));
+        foreach ($labels as $target_state => $label) {
           $output[] = '<button type="submit" name="stateChange" value="'.$target_state.'" class="link-button">'.$label.'</button>';
         }
         $output[] = '</form>';
