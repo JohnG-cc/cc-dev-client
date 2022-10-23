@@ -26,7 +26,7 @@ div.attention{border:medium solid #ffbbbb; margin:10px; padding:10px; background
 form.front{display:block;}
 .method{display:none;}
 form.method.front{display:block;}
-table.tabs {float:left;}
+table.tabs {float:left; z-index:10; position: relative;}
 td.tab{
     background-color: #ddd;
     padding: 0.3em 0.5em;

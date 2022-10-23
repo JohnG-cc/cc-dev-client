@@ -2,10 +2,11 @@
 
 namespace CCClient;
 
-use GuzzleHttp\RequestOptions;
-use CreditCommons\StandaloneEntry;
 use CCClient\Transaction;
+use CreditCommons\StandaloneEntry;
 use CreditCommons\Exceptions\CCError;
+use CreditCommons\NewTransaction;
+use GuzzleHttp\RequestOptions;
 
 /**
  * Class for a non-ledger client to call to a credit commons accounting node.
@@ -21,17 +22,22 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
    */
   public bool $show;
 
-
+  /**
+   * {@inheritDoc}
+   */
   public function handshake() : array {
     try {
-      return parent::handshake();
+      parent::handshake();
     }
     catch (Throwable $ex) {
       clientAddError($ex->makeMessage());
-      return [];
     }
+    return [];
   }
 
+  /**
+   * {@inheritDoc}
+   */
   public function accountNameFilter(string $path_to_node = '', $limit = 10) : array {
     try {
       return parent::accountNameFilter($path_to_node, $limit);
@@ -39,20 +45,33 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     catch (Throwable $ex) {
       clientAddError($ex->makeMessage());
     }
+    return [];
   }
 
+  /**
+   * {@inheritDoc}
+   */
   public function getOptions() : array {
     try {
       return parent::getOptions();
     }
-    catch (Exception $ex) {
-      clientAddError($ex->makeMessage());
+    catch (Exception $e) {
+      clientAddError($e->makeMessage());
     }
+    return [];
   }
 
+  /**
+   * {@inheritDoc}
+   */
   function getWorkflows(): array {
+    try {
+      $all_workflows = parent::getWorkflows();
+    }
+    catch (\Exception $e) {
+      clientAddError($e->makeMessage());
+    }
     $results = [];
-    $all_workflows = parent::getWorkflows();
     // The client doesn't want them keyed by hash.
     foreach ($all_workflows as $hash => $workflow) {
       $results[$workflow->id] = $workflow;
@@ -61,9 +80,60 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
   }
 
   /**
-   * @param array $params
-   * @return array
-   *   Transactioninterface[], transitions & links
+   * {@inheritDoc}
+   */
+  public function getAccountSummary(string $acc_path = '') : array {
+    try {
+      parent::getAccountSummary($acc_path);
+    }
+    catch (Exception $ex) {
+      clientAddError($e->makeMessage());
+    }
+    return [];
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public function submitNewTransaction(NewTransaction $new_transaction) : array {
+    try {
+      [$transaction, $transitions] =  parent::submitNewTransaction($new_transaction);
+    }
+    catch (Exception $ex) {
+      clientAddError($e->makeMessage());
+    }
+    $transaction->scribe = '';
+    return [$transaction, $transitions];
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  function getAccountLimits(string $acc_path = '') : array {
+    try {
+      parent::getAccountLimits($acc_path);
+    }
+    catch (Exception $ex) {
+      clientAddError($e->makeMessage());
+    }
+    return [];
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public function getAccountHistory(string $acc_path, int $samples = 0) : array {
+    try {
+      parent::getAccountHistory($acc_path, $samples);
+    }
+    catch (Exception $ex) {
+      clientAddError($e->makeMessage());
+    }
+    return [];
+  }
+
+  /**
+   * {@inheritDoc}
    */
   public function filterTransactions(array $params = []): array {
     try {
@@ -85,14 +155,16 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     return $filtered;
   }
 
-
+  /**
+   * {@inheritDoc}
+   */
   public function filterTransactionEntries(array $params = []): array {
     try {
       [$items, $links] = parent::filterTransactionEntries($params);
     }
     catch (CCError $e) {
       clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
-      $results = [];
+      return [[], []];
     }
     $filtered = [];
     foreach ($items as $entry) {
@@ -102,44 +174,10 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
   }
 
   /**
-   * Upcast the result transactions. NB this NOT part of the API.
-   * @return array
-   *   The transactions and the transitions.
-   */
-  public function getUpcastTransaction(string $uuid) : array {
-    [$transaction, $transitions] = parent::getTransaction($uuid);
-    $transaction->scribe = 'trunkward node'; // This required property needs handling better.
-    return [Transaction::create($transaction), $transitions];
-  }
-
-  /**
-   * Upcast the result entries. NB this NOT part of the API.
-   * @return array
-   *   The transactions and the transitions.
-   */
-  public function getUpcastEntries(string $uuid) : array {
-    $entries = parent::getTransactionEntries($uuid);
-    foreach ($entries as $en) {
-      $entries[] = StandaloneEntry::create($en);
-    }
-    return [$entries];
-  }
-
-  /**
    * Print the request if needed.
    */
   protected function request(int $required_code, string $endpoint = '/') :\stdClass|NULL {
-    try {
-      $result = parent::request($required_code, $endpoint);
-    }
-    catch(CCError $e) {
-      echo '<font color=red>'.$e->makeMessage().'</font>';
-      $result = NULL;
-    }
-    catch(\Throwable $e) {
-      echo '<font color=red>'.$e->getMessage().'</font>';
-      $result = NULL;
-    }
+    $result = parent::request($required_code, $endpoint);
     if ($this->show) {
       // See client.php display_errors_warnings() to see how this is handled specially.
       $url = "$this->baseUrl/$endpoint";
@@ -166,6 +204,42 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       $raw_result = $contents;
     }
     return json_decode($contents);
+  }
+
+  /**
+   * Upcast the result transactions. NB this NOT part of the API.
+   * @return array
+   *   The transactions and the transitions.
+   */
+  public function getUpcastTransaction(string $uuid) : array {
+    try {
+      [$transaction, $transitions] = parent::getTransaction($uuid);
+    }
+    catch (\Exception $e) {
+      clientAddError($e->makeMessage());
+      return [NULL, []];
+    }
+    $transaction->scribe = 'trunkward node'; // This required property needs handling better.
+    return [Transaction::create($transaction), $transitions];
+  }
+
+  /**
+   * Upcast the result entries. NB this NOT part of the API.
+   * @return array
+   *   The transactions and the transitions.
+   */
+  public function getUpcastEntries(string $uuid) : array {
+    try {
+      $results = parent::getTransactionEntries($uuid);
+    }
+    catch (\Exception $e) {
+      clientAddError($e->makeMessage());
+      return [];
+    }
+    foreach ($results as $en) {
+      $entries[] = StandaloneEntry::create($en);
+    }
+    return $entries;
   }
 
 }

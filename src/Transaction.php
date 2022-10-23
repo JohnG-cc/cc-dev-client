@@ -14,6 +14,7 @@ class Transaction extends \CreditCommons\Leaf\Transaction {
    */
   function getWorkflow() : Workflow {
     global $node;
+    // The workflow doesn't exist on the leaf so must be retreived from the node.
     $workflows = $node->requester()->getWorkflows();
     //some kind of caching may be appropriate
     return $workflows[$this->type];

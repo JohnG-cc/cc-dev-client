@@ -8,7 +8,7 @@ use \CCClient\Transaction;
  */
 class TransactionSentence {
 
-  const TEMPLATE = '<div class = "sentence @class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
+  const TEMPLATE = '<div class = "sentence@class @state">@payer will pay @payee @quant for \'@description\' @links</div>';
   const TOKENS = ['@class', '@state', '@payee', '@payer', '@quant', '@description', '@links'];
   private array $workflows;
 

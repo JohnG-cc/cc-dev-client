@@ -24,11 +24,8 @@
           exit;
         }
       }
-      catch (\CreditCommons\Exceptions\CCError $e) {
-        echo "Unable to connect to ".$_GET['node'].': '.$e->makeMessage();
-      }
       catch (\Throwable $e) {
-        echo "Unable to connect to ".$_GET['node'].': '.$e->getMessage();
+        echo get_class($e)." Unable to connect to ".$_GET['node'].': '.$e->getMessage();
       }
     }
   ?>
