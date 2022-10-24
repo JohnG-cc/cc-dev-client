@@ -25,6 +25,7 @@
         }
       }
       catch (\Throwable $e) {
+        print_r($e);
         echo get_class($e)." Unable to connect to ".$_GET['node'].': '.$e->getMessage();
       }
     }

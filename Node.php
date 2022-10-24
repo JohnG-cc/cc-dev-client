@@ -109,31 +109,3 @@ class Node {
   }
 
 }
-
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddError($message) {
-  global $info;
-  if (!is_string($message)) {
-    $message = '<pre>'.print_r($message, 1).'</pre>';
-  }
-  $info[] = '<font color="red">'.$message.'</font>';
-}
-
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddInfo($message) {
-  global $info;
-  if ($message) {
-    if (!is_string($message)) {
-      $message = '<pre>'.print_r($message, 1).'</pre>';
-    }
-    $info[] = '<font color="green">'.$message.'</font>';
-  }
-}

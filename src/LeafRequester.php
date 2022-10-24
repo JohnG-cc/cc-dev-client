@@ -29,8 +29,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       parent::handshake();
     }
-    catch (Throwable $ex) {
-      clientAddError($ex->makeMessage());
+    catch (\Throwable $e) {
+      clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -42,8 +43,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       return parent::accountNameFilter($path_to_node, $limit);
     }
-    catch (Throwable $ex) {
+    catch (\Throwable $e) {
       clientAddError($ex->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -55,8 +57,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       return parent::getOptions();
     }
-    catch (Exception $e) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -68,8 +71,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       $all_workflows = parent::getWorkflows();
     }
-    catch (\Exception $e) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     $results = [];
     // The client doesn't want them keyed by hash.
@@ -86,8 +90,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       parent::getAccountSummary($acc_path);
     }
-    catch (Exception $ex) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -99,8 +104,10 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       [$transaction, $transitions] =  parent::submitNewTransaction($new_transaction);
     }
-    catch (Exception $ex) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
+      return[NULL, NULL];
     }
     $transaction->scribe = '';
     return [$transaction, $transitions];
@@ -113,8 +120,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       parent::getAccountLimits($acc_path);
     }
-    catch (Exception $ex) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -126,8 +134,9 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       parent::getAccountHistory($acc_path, $samples);
     }
-    catch (Exception $ex) {
+    catch (\Throwable $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
     }
     return [];
   }
@@ -142,6 +151,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     }
     catch (CCError $e) {
       clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
+      clientAddError($e);
       $transactions = [];
     }
     $filtered = [];
@@ -164,6 +174,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     }
     catch (CCError $e) {
       clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
+      clientAddError($e);
       return [[], []];
     }
     $filtered = [];
@@ -234,6 +245,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     }
     catch (\Exception $e) {
       clientAddError($e->makeMessage());
+      clientAddError($e);
       return [];
     }
     foreach ($results as $en) {

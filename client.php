@@ -166,11 +166,11 @@ function render_tabs() {
 
 /**
  * Render a method form as a subtab
- * @param type $method
- * @param type $is_front
- * @return type
+ * @param string $method
+ * @param bool $is_front
+ * @return string
  */
-function get_method_form($method, $is_front) {
+function get_method_form(string $method, bool $is_front) : string {
   global $raw_result;
   $attributes = $form_lines = [];
   MakeForm::$method($form_lines);
@@ -183,11 +183,11 @@ function get_method_form($method, $is_front) {
     return makeHtmlBlock('div', implode($form_lines), $attributes);
   }
   else {
-    $output = '';
     if ($raw_result and $is_front) {
       clientAddInfo('<p><strong>Response:</strong><br /><pre>'.json_prettify($raw_result).'</pre>');
     }
-    return $output .= wrapInFormTags($attributes, implode($form_lines));
+    $attributes['method'][] = 'post';
+    return makeHtmlBlock('form', implode($form_lines), $attributes);
   }
 }
 
@@ -412,7 +412,6 @@ class MakeForm {
     $output[] = '<p>Check that connected ledgers are online and the hashes match.</p>';
     $output[] = '<input type = "submit" name = "handshake" value="Handshakes" />';
   }
-
 }
 
 function makeHtmlBlock($tag_name, $content, array $attributes  = []) : string {
@@ -423,18 +422,10 @@ function makeHtmlBlock($tag_name, $content, array $attributes  = []) : string {
   return "<$tag_name ".implode(' ', $atts) .">$content</$tag_name>";
 }
 
-function wrapInFormTags($attributes, $content) {
-  foreach ($attributes as $at => $vals) {
-    $atts[] = $at .'="'.implode(' ', $vals).'"';
-  }
-  return '<form method=post '.implode(' ', $atts) .'>'.$content.'</form>';
-}
-
 function selectAccount(string $element_name, $default_val = '', $class = '', $all_option = FALSE) {
   global $node;
   return $node->selectAccountWidget($element_name, $default_val, $class, $all_option);
 }
-
 
 function selectAccStatus(string $element_name, $default_val = '') {
   $output[] = "<select name=\"$element_name\">";
@@ -493,18 +484,13 @@ function topTransactions() {
     ];
     ini_set('display_errors', 1);
     $newT = NewTransaction::create($fields);
-    try {
-      // Depending on the transaction type/workflow, the result could be a
-      // transaction in 'full' format, needing confirmation, or nothing.
-      [$transaction_data, $transitions] = $node->requester(TRUE)->submitNewTransaction($newT);
-      if ($transaction_data) {
-        $transaction = \CCClient\Transaction::createFromJsonClass($transaction_data, $transitions);
-        $top_transactions[] = $transaction;
-        clientAddInfo($transaction);
-      }
-    }
-    catch (\Exception $e) {
-      clientAddError('Faileld to submit new transaction: '.$e->getMessage());
+    // Depending on the transaction type/workflow, the result could be a
+    // transaction in 'full' format, needing confirmation, or nothing.
+    [$transaction_data, $transitions] = $node->requester(TRUE)->submitNewTransaction($newT);
+    if ($transaction_data) {
+      $transaction = \CCClient\Transaction::createFromJsonClass($transaction_data, $transitions);
+      $top_transactions[] = $transaction;
+      clientAddInfo($transaction);
     }
   }
   else {
@@ -638,16 +624,12 @@ function json_prettify(string $json) {
 	$newLine     = "\n";
 	$prevChar    = '';
 	$outOfQuotes = true;
-
-	for ($i=0; $i<=$strLen; $i++)
-	{
+	for ($i=0; $i<=$strLen; $i++)	{
 		// Grab the next character in the string.
 		$char = substr($json, $i, 1);
-
 		// Are we inside a quoted string?
 		if ($char == '"' && $prevChar != '\\') {
 			$outOfQuotes = !$outOfQuotes;
-
 			// If this character is the end of an element,
 			// output a new line and indent the next line.
 		} else if(($char == '}' || $char == ']') && $outOfQuotes) {
@@ -657,10 +639,8 @@ function json_prettify(string $json) {
 				$result .= $indentStr;
 			}
 		}
-
 		// Add the character to the result string.
 		$result .= $char;
-
 		// If the last character was the beginning of an element,
 		// output a new line and indent the next line.
 		if (($char == ',' || $char == '{' || $char == '[') && $outOfQuotes) {
@@ -668,14 +648,39 @@ function json_prettify(string $json) {
 			if ($char == '{' || $char == '[') {
 				$pos ++;
 			}
-
 			for ($j = 0; $j < $pos; $j++) {
 				$result .= $indentStr;
 			}
 		}
-
 		$prevChar = $char;
 	}
-
 	return $result;
+}
+
+/**
+ *
+ * @global string $info
+ * @param mixed $message
+ */
+function clientAddError($message) {
+  global $info;
+  if (!is_string($message)) {
+    $message = '<pre>'.print_r($message, 1).'</pre>';
+  }
+  $info[] = '<font color="red">'.$message.'</font>';
+}
+
+/**
+ *
+ * @global string $info
+ * @param mixed $message
+ */
+function clientAddInfo($message) {
+  global $info;
+  if ($message) {
+    if (!is_string($message)) {
+      $message = '<pre>'.print_r($message, 1).'</pre>';
+    }
+    $info[] = '<font color="green">'.$message.'</font>';
+  }
 }

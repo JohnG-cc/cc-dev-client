@@ -3,7 +3,7 @@ div, form{vertical-align: top;}
 form, div.method{ padding:0.5em; background-color: #eee;}
 div.messages{background-color:#ccc; padding:0 1em;}
 div.log{background-color:#000; color: #fff; padding:0 1em;}
-div.feedback{margin-left: 180px;}
+div.feedback{margin-left: 15em;}
 .required::after {content:'*';color:red;}
 form.inline{padding:0;display:inline;background-color:transparent;}
 .link-button {border: none; color: blue; text-decoration: underline; cursor: pointer; background-color:transparent;}
