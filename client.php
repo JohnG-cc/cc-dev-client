@@ -12,6 +12,7 @@ use CreditCommons\Exceptions\CCError;
 
 $message_file = './messages.msg';
 @unlink('../devel.log');
+ini_set('display_errors', 1);
 set_error_handler('display_errors_warnings');
 set_exception_handler('print_exception_to_file')
 ?><body bgcolor="fafafa">
@@ -79,6 +80,7 @@ if ($_POST) {
     }
     catch (CCError $e) {
       clientAddError('Failed to change transaction state: '.$e->makeMessage() );
+      clientAddError($e);
     }
   }
   elseif (isset($workflows)) {
@@ -655,32 +657,4 @@ function json_prettify(string $json) {
 		$prevChar = $char;
 	}
 	return $result;
-}
-
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddError($message) {
-  global $info;
-  if (!is_string($message)) {
-    $message = '<pre>'.print_r($message, 1).'</pre>';
-  }
-  $info[] = '<font color="red">'.$message.'</font>';
-}
-
-/**
- *
- * @global string $info
- * @param mixed $message
- */
-function clientAddInfo($message) {
-  global $info;
-  if ($message) {
-    if (!is_string($message)) {
-      $message = '<pre>'.print_r($message, 1).'</pre>';
-    }
-    $info[] = '<font color="green">'.$message.'</font>';
-  }
 }

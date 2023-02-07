@@ -20,15 +20,4 @@ class Transaction extends \CreditCommons\Leaf\Transaction {
     return $workflows[$this->type];
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  function upcastEntries(array $rows, bool $additional = FALSE): void {
-    // No need for upcasting on the client site.
-    foreach ($rows as $row) {
-      $this->entries[] = $row;
-    }
-  }
-
 }
-

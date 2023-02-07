@@ -30,7 +30,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       parent::handshake();
     }
     catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     return [];
@@ -44,7 +44,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       return parent::accountNameFilter($path_to_node, $limit);
     }
     catch (\Throwable $e) {
-      clientAddError($ex->makeMessage());
+      clientAddError($ex->getMessage());
       clientAddError($e);
     }
     return [];
@@ -57,8 +57,8 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       return parent::getOptions();
     }
-    catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+    catch (\Throwable $e) {print_r($e);exit;
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     return [];
@@ -72,7 +72,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       $all_workflows = parent::getWorkflows();
     }
     catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     $results = [];
@@ -91,7 +91,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       parent::getAccountSummary($acc_path);
     }
     catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     return [];
@@ -104,12 +104,16 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     try {
       [$transaction, $transitions] =  parent::submitNewTransaction($new_transaction);
     }
-    catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+    catch (CCError $e) {
+      clientAddError($e->getMessage());
       clientAddError($e);
       return[NULL, NULL];
     }
-    $transaction->scribe = '';
+    catch (\Exception $e) {
+      clientAddError($e->getMessage());
+      clientAddError($e);
+      return[NULL, NULL];
+    }
     return [$transaction, $transitions];
   }
 
@@ -121,7 +125,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       parent::getAccountLimits($acc_path);
     }
     catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     return [];
@@ -135,7 +139,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       parent::getAccountHistory($acc_path, $samples);
     }
     catch (\Throwable $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
     }
     return [];
@@ -150,17 +154,14 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       [$transactions, $transitions] = parent::filterTransactions($params);
     }
     catch (CCError $e) {
-      clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
+      clientAddError('Failed to load pending transactions: '.$e->getMessage() .' '. http_build_query($params) );
       clientAddError($e);
       $transactions = [];
     }
     $filtered = [];
     foreach ($transactions as $trans) {
-      foreach ($trans->entries as &$row) {
-        $row->author = $this->nodeName;
-      }
       $actions = (array)$transitions->{$trans->uuid};
-      $filtered[] = \CCClient\Transaction::createFromJsonClass($trans, $actions);
+      $filtered[] = Transaction::createFromJsonClass($trans, $actions);
     }
     return $filtered;
   }
@@ -173,7 +174,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       [$items, $links] = parent::filterTransactionEntries($params);
     }
     catch (CCError $e) {
-      clientAddError('Failed to load pending transactions: '.$e->makeMessage() .' '. http_build_query($params) );
+      clientAddError('Failed to load pending transactions: '.$e->getMessage() .' '. http_build_query($params) );
       clientAddError($e);
       return [[], []];
     }
@@ -210,7 +211,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
    */
   protected function processResponse($response, int $required_code) : \stdClass|NULL {
     global $raw_result;
-    $contents = $response->getBody()->getContents();// not prettified
+    $contents = strval($response->getBody());
     if ($this->show){
       $raw_result = $contents;
     }
@@ -227,7 +228,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       [$transaction, $transitions] = parent::getTransaction($uuid);
     }
     catch (\Exception $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       return [NULL, []];
     }
     $transaction->scribe = 'trunkward node'; // This required property needs handling better.
@@ -244,7 +245,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       $results = parent::getTransactionEntries($uuid);
     }
     catch (\Exception $e) {
-      clientAddError($e->makeMessage());
+      clientAddError($e->getMessage());
       clientAddError($e);
       return [];
     }
