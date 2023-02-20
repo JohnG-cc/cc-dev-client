@@ -2,7 +2,7 @@
 
 namespace CCClient;
 
-use CreditCommons\StandaloneEntry;
+use CreditCommons\EntryDisplay;
 
 /**
  * Class for the client to handle responses with Transactions.
@@ -13,7 +13,7 @@ class TransactionEntrySentence {
   const TOKENS = ['@state', '@payee', '@payer', '@quant', '@description'];
 
   function __construct(
-    private StandaloneEntry $entry
+    private EntryDisplay $entry
   ) {
   }
 

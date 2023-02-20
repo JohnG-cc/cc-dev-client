@@ -45,7 +45,7 @@ if ($_POST) {
     }
   }
   elseif(isset($accountNameFilter)) {
-    $node->accountNameFilter($fragment, TRUE);
+    $node->requester(TRUE)->accountNameFilter($fragment, TRUE);
   }
   elseif (isset($accountSummary)) {
     try {
@@ -102,9 +102,9 @@ if ($_POST) {
       clientAddError('Failed to get trunkward node names: '.$e->makeMessage() );
     }
   }
-  elseif (isset($convertPrice)) {
+  elseif (isset($about)) {
     try {
-      $ratio = $node->requester(TRUE)->convertPrice($pricenode);
+      $ratio = $node->requester(TRUE)->about($pricenode);
     }
     catch (CCError $e) {
       clientAddError('Failed to get price ratio: '.$e->makeMessage() );
@@ -186,7 +186,7 @@ function get_method_form(string $method, bool $is_front) : string {
   }
   else {
     if ($raw_result and $is_front) {
-      clientAddInfo('<p><strong>Response:</strong><br /><pre>'.json_prettify($raw_result).'</pre>');
+      clientAddInfo('<p><strong>Response:</strong><br /><pre>'. htmlentities(json_prettify($raw_result)).'</pre>');
     }
     $attributes['method'][] = 'post';
     return makeHtmlBlock('form', implode($form_lines), $attributes);
@@ -195,12 +195,12 @@ function get_method_form(string $method, bool $is_front) : string {
 
 class MakeForm {
 
-  static function convertPrice(&$output) {
-    global $pricenode, $convertPrice;
-    $output[] = '<h3>Convert price</h3>';
-    $output[] = '<p>Get the ratio of the unit of value on a remote node compare the current node</p>';
+  static function about(&$output) {
+    global $pricenode, $about;
+    $output[] = '<h3>Currency info</h3>';
+    $output[] = '<p>Get the conversion rate, display format and limits for a node or account. (Only partially implemented ATM.)</p>';
     $output[] = '<input name = "pricenode" class = "required" value= "'. $pricenode .'" />';
-    $output[] = '<input type = "submit" name = "convertPrice" value = "Create" />';
+    $output[] = '<input type = "submit" name = "about" value = "Create" />';
   }
 
   static function permittedEndPoints(&$output) {
@@ -351,7 +351,7 @@ class MakeForm {
   static function accountNameFilter(&$output) {
     global $fragment;
     $output[] = '<h3>View accounts</h3>';
-    $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion.</p>';
+    $output[] = '<p>Member can see all accounts on all the trunkwards ledgers, but leafwards ledger reveal accounts at their own discretion. Note that the current account name is not returned.</p>';
     $output[] = '<p>Put a fragment of an accountname or path</p>';
     $output[] = '<p>Fragment: <input name="fragment" class="required" value="'. $fragment .'" autocomplete="off" />';
     $output[] = '<input type = "submit"  name = "accountNameFilter" value = "Query"/></p>';

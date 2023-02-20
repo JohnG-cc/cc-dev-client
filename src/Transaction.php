@@ -7,7 +7,7 @@ use CreditCommons\Workflow;
  * Class for the client to handle responses with Transactions.
  * @deprecated
  */
-class Transaction extends \CreditCommons\Leaf\Transaction {
+class Transaction extends \CreditCommons\Leaf\LeafTransaction {
 
   /**
    * {@inheritDoc}

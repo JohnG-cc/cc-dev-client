@@ -3,10 +3,11 @@
 namespace CCClient;
 
 use CCClient\Transaction;
-use CreditCommons\StandaloneEntry;
+use CreditCommons\EntryDisplay;
 use CreditCommons\Exceptions\CCError;
 use CreditCommons\NewTransaction;
 use GuzzleHttp\RequestOptions;
+use GuzzleHttp\Client;
 
 /**
  * Class for a non-ledger client to call to a credit commons accounting node.
@@ -39,15 +40,32 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
   /**
    * {@inheritDoc}
    */
+  public function about(string $node_path) : \stdClass {
+    try {
+      return $this->request("about?node_path=$node_path")->data;
+    }
+    catch (\Throwable $e) {
+      clientAddError($e->getMessage());
+      clientAddError($e);
+    }
+
+    return new \stdClass();
+  }
+
+
+  /**
+   * {@inheritDoc}
+   */
   public function accountNameFilter(string $path_to_node = '', $limit = 10) : array {
     try {
-      return parent::accountNameFilter($path_to_node, $limit);
+      $names = parent::accountNameFilter($path_to_node, $limit);
     }
     catch (\Throwable $e) {
       clientAddError($ex->getMessage());
       clientAddError($e);
+      $names = [];
     }
-    return [];
+    return $names;
   }
 
   /**
@@ -88,13 +106,14 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
    */
   public function getAccountSummary(string $acc_path = '') : array {
     try {
-      parent::getAccountSummary($acc_path);
+      $results = parent::getAccountSummary($acc_path);
     }
     catch (\Throwable $e) {
       clientAddError($e->getMessage());
       clientAddError($e);
+      $results = [];
     }
-    return [];
+    return $results;
   }
 
   /**
@@ -180,7 +199,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
     }
     $filtered = [];
     foreach ($items as $entry) {
-      $filtered[] = \CreditCommons\StandaloneEntry::create($entry);
+      $filtered[] = \CreditCommons\EntryDisplay::create($entry);
     }
     return [$filtered, $links];
   }
@@ -188,8 +207,26 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
   /**
    * Print the request if needed.
    */
-  protected function request(int $required_code, string $endpoint = '/') :\stdClass|NULL {
-    $result = parent::request($required_code, $endpoint);
+  protected function request(string $endpoint = '/') :\stdClass|NULL {
+    $parts = parse_url($this->baseUrl);
+    if (isset($parts['path'])) {
+      $endpoint = $parts['path'] .'/'.$endpoint;
+      $this->baseUrl = $parts['scheme'].'://'.$parts['host'];
+      if (isset($parts['port'])){
+        $this->baseUrl .= ':'.$parts['port'];
+      }
+    }
+    try{
+      $client = new Client(['base_uri' => $this->baseUrl, 'timeout' => 1]);
+      $response = $client->{$this->method}($endpoint, $this->options);
+    }
+    catch (\Throwable $e) {
+      clientAddError($e->getMessage());
+      clientAddError($e);
+      return NULL;
+    }
+    $result_contents = $response->getBody()->getContents();
+
     if ($this->show) {
       // See client.php display_errors_warnings() to see how this is handled specially.
       $url = "$this->baseUrl/$endpoint";
@@ -201,21 +238,25 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       if (isset($this->options[RequestOptions::BODY])) {
         clientAddInfo("<strong>Body:</strong> ".$this->options[RequestOptions::BODY]);
       }
+      $this->processResponse($response);
       $this->show = FALSE;
     }
-    return $result;
+    if ($result_contents) return json_decode($result_contents);
+    return new \stdClass;
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function processResponse($response, int $required_code) : \stdClass|NULL {
+  protected function processResponse($response) : \stdClass|NULL {
     global $raw_result;
-    $contents = strval($response->getBody());
+    $body = $response->getBody();
+    $body->rewind();
+    $result_contents = strval($body->getContents());
     if ($this->show){
-      $raw_result = $contents;
+      $raw_result = $result_contents;
     }
-    return json_decode($contents);
+    return json_decode($result_contents);
   }
 
   /**
@@ -250,7 +291,7 @@ class LeafRequester extends \CreditCommons\Leaf\LeafRequester {
       return [];
     }
     foreach ($results as $en) {
-      $entries[] = StandaloneEntry::create($en);
+      $entries[] = EntryDisplay::create($en);
     }
     return $entries;
   }

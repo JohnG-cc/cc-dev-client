@@ -68,7 +68,7 @@ function clientAddInfo($message) {
     if (!is_string($message)) {
       $message = '<pre>'.print_r($message, 1).'</pre>';
     }
-    $info[] = '<font color="green">'.$message.'</font>';
+    $info[] = '<font color="green">'. $message.'</font>';
   }
 }
 ?>
